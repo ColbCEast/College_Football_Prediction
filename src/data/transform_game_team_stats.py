@@ -313,6 +313,188 @@ def create_recent_form_stats(team_stats):
     return team_stats
 
 
+def create_location_stats(team_stats):
+
+    team_stats = team_stats.copy()
+
+    team_stats["isHome"] = team_stats["homeAway"] == "home"
+    team_stats["isAway"] = team_stats["homeAway"] == "away"
+
+    location_features = {}
+
+    stat_columns = [
+        "pointsFor",
+        "pointsAgainst",
+        "rushingYards",
+        "rushingAttempts",
+        "netPassingYards",
+        "passAttempts",
+        "completions",
+        "totalYards",
+        "firstDowns",
+        "rushingTDs",
+        "passingTDs",
+        "thirdDownConversions",
+        "thirdDownAttempts",
+        "fourthDownConversions",
+        "fourthDownAttempts",
+        "penalties",
+        "penaltyYards",
+        "possessionSeconds",
+        "turnovers",
+        "fumblesLost",
+        "interceptions",
+        "sacks",
+        "qbHurries",
+        "passesDeflected",
+        "tacklesForLoss",
+        "defensiveTDs",
+    ]
+
+    for mask, prefix in [
+        (team_stats["isHome"], "home"),
+        (team_stats["isAway"], "away")
+    ]:
+
+        location_indicator = mask.astype(int)
+
+        # Games before this game at this location
+        location_games = (
+            location_indicator
+            .groupby(team_stats["team"])
+            .cumsum()
+            - location_indicator
+        )
+
+        location_features[f"{prefix}GamesBefore"] = location_games
+
+        # Wins before this game at this location
+        location_win_values = (
+            team_stats["win"] * location_indicator
+        )
+
+        location_wins = (
+            location_win_values
+            .groupby(team_stats["team"])
+            .cumsum()
+            - location_win_values
+        )
+
+        location_features[f"{prefix}WinsBefore"] = location_wins
+
+        # Win percentage
+        location_features[f"{prefix}WinPctBefore"] = (
+            location_wins / location_games
+        )
+
+        # Cumulative statistics and averages
+        for stat in stat_columns:
+
+            stat_values = (
+                team_stats[stat] * location_indicator
+            )
+
+            cumulative = (
+                stat_values
+                .groupby(team_stats["team"])
+                .cumsum()
+            )
+
+            cumulative_before = (
+                cumulative - stat_values
+            )
+
+            location_features[
+                f"{prefix}{stat[0].upper()}{stat[1:]}Before"
+            ] = cumulative_before
+
+            location_features[
+                f"{prefix}{stat[0].upper()}{stat[1:]}AvgBefore"
+            ] = (
+                cumulative_before / location_games
+            )
+
+        # Point differential
+        differential = (
+            team_stats["pointsFor"]
+            - team_stats["pointsAgainst"]
+        )
+
+        differential_values = (
+            differential * location_indicator
+        )
+
+        cumulative_differential = (
+            differential_values
+            .groupby(team_stats["team"])
+            .cumsum()
+        )
+
+        differential_before = (
+            cumulative_differential
+            - differential_values
+        )
+
+        location_features[
+            f"{prefix}PointDifferentialBefore"
+        ] = differential_before
+
+        location_features[
+            f"{prefix}PointDifferentialAvgBefore"
+        ] = (
+            differential_before / location_games
+        )
+
+        # Efficiency metrics
+        location_features[
+            f"{prefix}CompletionPctBefore"
+        ] = (
+            location_features[f"{prefix}CompletionsBefore"]
+            / location_features[f"{prefix}PassAttemptsBefore"]
+        )
+
+        location_features[
+            f"{prefix}ThirdDownPctBefore"
+        ] = (
+            location_features[f"{prefix}ThirdDownConversionsBefore"]
+            / location_features[f"{prefix}ThirdDownAttemptsBefore"]
+        )
+
+        location_features[
+            f"{prefix}FourthDownPctBefore"
+        ] = (
+            location_features[f"{prefix}FourthDownConversionsBefore"]
+            / location_features[f"{prefix}FourthDownAttemptsBefore"]
+        )
+
+        location_features[
+            f"{prefix}YardsPerRushAttemptBefore"
+        ] = (
+            location_features[f"{prefix}RushingYardsBefore"]
+            / location_features[f"{prefix}RushingAttemptsBefore"]
+        )
+
+        location_features[
+            f"{prefix}YardsPerPassAttemptBefore"
+        ] = (
+            location_features[f"{prefix}NetPassingYardsBefore"]
+            / location_features[f"{prefix}PassAttemptsBefore"]
+        )
+
+    # Add all newly created columns at once
+    location_features_df = pd.DataFrame(
+        location_features,
+        index=team_stats.index
+    )
+
+    team_stats = pd.concat(
+        [team_stats, location_features_df],
+        axis=1
+    )
+
+    return team_stats
+
+
 if __name__ == "__main__":
     games, game_team_stats = load_data(2025)
 
@@ -328,18 +510,22 @@ if __name__ == "__main__":
 
     team_stats = create_recent_form_stats(team_stats)
 
+    team_stats = create_location_stats(team_stats)
+
     print(team_stats[team_stats["team"] == "Kansas State"][
         [
             "startDate",
-            "week",
-            "pointsFor",
-            "pointsForAvgLast3",
-            "pointsAgainstAvgLast3",
-            "pointDifferentialAvgLast3",
-            "winPctLast3",
-            "pointsForAvgLast5",
-            "pointsAgainstAvgLast5",
-            "winPctLast5"
+            "homeAway",
+            "homeGamesBefore",
+            "homeWinsBefore",
+            "homeWinPctBefore",
+            "homePointsForAvgBefore",
+            "homePointsAgainstAvgBefore",
+            "awayGamesBefore",
+            "awayWinsBefore",
+            "awayWinPctBefore",
+            "awayPointsForAvgBefore",
+            "awayPointsAgainstAvgBefore"
         ]
     ].to_string(index = False))
 
