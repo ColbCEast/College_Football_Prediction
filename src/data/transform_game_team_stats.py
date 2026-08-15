@@ -259,6 +259,60 @@ def create_pre_game_stats(team_stats):
     return team_stats
 
 
+def create_recent_form_stats(team_stats):
+    # This function is to create rolling average stats
+    # for the last 3 games and the last 5 games
+    
+    team_stats = team_stats.copy()
+
+    # Ensure that the dataframe is sorted chronologically within team
+    team_stats = team_stats.sort_values(
+        ["team", "startDate"]
+    )
+
+    # Create a list of stats that we'll calculate rolling averages for
+    rolling_stats = [
+        "pointsFor",
+        "pointsAgainst",
+        "pointDifferential",
+        "rushingYards",
+        "netPassingYards",
+        "totalYards",
+        "sacks",
+        "qbHurries",
+        "passesDeflected",
+        "tacklesForLoss",
+        "turnovers"
+    ]
+
+    # Create rolling averages, avoiding leakage by shifting
+    for window in [3, 5]:
+        for stat in rolling_stats:
+            team_stats[f"{stat}AvgLast{window}"] = (
+                team_stats.groupby("team")[stat]
+                .transform(
+                    lambda x: 
+                    x.shift(1)
+                    .rolling(window, min_periods = 1)
+                    .mean()
+                )
+            )
+
+    # Rolling win percentage
+    for window in [3, 5]:
+        team_stats[f"winPctLast{window}"] = (
+            team_stats.groupby("team")["win"]
+            .transform(
+                lambda x:
+                x.shift(1)
+                .rolling(window, min_periods = 1)
+                .mean()
+            )
+        )
+
+    return team_stats
+
+
 if __name__ == "__main__":
     games, game_team_stats = load_data(2025)
 
@@ -272,21 +326,21 @@ if __name__ == "__main__":
 
     team_stats = create_pre_game_stats(team_stats)
 
-    print(team_stats[
-        team_stats["team"] == "Kansas State"
-    ][
-        ["startDate",
-         "week",
-         "gamesBefore",
-         "winsBefore",
-         "winPctBefore",
-         "pointsForAvgBefore",
-         "rushingYardsAvgBefore",
-         "netPassingYardsAvgBefore",
-         "totalYardsAvgBefore",
-         "completionPctBefore",
-         "thirdDownPctBefore",
-         "fourthDownPctBefore",
-         "yardsPerRushAttemptBefore",
-         "yardsPerPassAttemptBefore",]
+    team_stats = create_recent_form_stats(team_stats)
+
+    print(team_stats[team_stats["team"] == "Kansas State"][
+        [
+            "startDate",
+            "week",
+            "pointsFor",
+            "pointsForAvgLast3",
+            "pointsAgainstAvgLast3",
+            "pointDifferentialAvgLast3",
+            "winPctLast3",
+            "pointsForAvgLast5",
+            "pointsAgainstAvgLast5",
+            "winPctLast5"
+        ]
     ].to_string(index = False))
+
+    # team_stats.to_csv("data/processed/game_team_stats/game_team_stats_2025.csv")
