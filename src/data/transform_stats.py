@@ -52,15 +52,116 @@ def transform_game_stats(year):
 
     return df
 
+def create_pregame_stats(year):
+    """
+    Create pre-game cumulative statistics for each team
+    
+    Each team's statistics for a game are calculated using
+    only that team's previous games.
+    
+    This method is used to prevent data leakage
+    """
+
+    filepath = f"data/processed/game_stats/game_stats_{year}.csv"
+
+    df = pd.read_csv(filepath)
+
+    # Features calculated from games played prior to the current game.
+
+    pregame_features = [
+        # Overall offense
+        "offense_plays",
+        "offense_drives",
+        "offense_ppa",
+        "offense_totalPPA",
+        "offense_successRate",
+        "offense_explosiveness",
+        "offense_powerSuccess",
+        "offense_stuffRate",
+        "offense_lineYards",
+        "offense_lineYardsTotal",
+        "offense_secondLevelYards",
+        "offense_secondLevelYardsTotal",
+        "offense_openFieldYards",
+        "offense_openFieldYardsTotal",
+
+        # Offensive situation
+        "offense_standardDowns_ppa",
+        "offense_standardDowns_successRate",
+        "offense_standardDowns_explosiveness",
+        "offense_passingDowns_ppa",
+        "offense_passingDowns_successRate",
+        "offense_passingDowns_explosiveness",
+
+        # Rushing offense
+        "offense_rushingPlays_ppa",
+        "offense_rushingPlays_totalPPA",
+        "offense_rushingPlays_successRate",
+        "offense_rushingPlays_explosiveness",
+
+        # Passing offense
+        "offense_passingPlays_ppa",
+        "offense_passingPlays_totalPPA",
+        "offense_passingPlays_successRate",
+        "offense_passingPlays_explosiveness",
+
+        # Overall defense
+        "defense_plays",
+        "defense_drives",
+        "defense_ppa",
+        "defense_totalPPA",
+        "defense_successRate",
+        "defense_explosiveness",
+        "defense_powerSuccess",
+        "defense_stuffRate",
+        "defense_lineYards",
+        "defense_lineYardsTotal",
+        "defense_secondLevelYards",
+        "defense_secondLevelYardsTotal",
+        "defense_openFieldYards",
+        "defense_openFieldYardsTotal",
+
+        # Defensive situation
+        "defense_standardDowns_ppa",
+        "defense_standardDowns_successRate",
+        "defense_standardDowns_explosiveness",
+        "defense_passingDowns_ppa",
+        "defense_passingDowns_successRate",
+        "defense_passingDowns_explosiveness",
+
+        # Rushing defense
+        "defense_rushingPlays_ppa",
+        "defense_rushingPlays_totalPPA",
+        "defense_rushingPlays_successRate",
+        "defense_rushingPlays_explosiveness",
+
+        # Passing defense
+        "defense_passingPlays_ppa",
+        "defense_passingPlays_totalPPA",
+        "defense_passingPlays_successRate",
+        "defense_passingPlays_explosiveness"
+    ]
+
+    # Sort chronologically within each team
+    df = df.sort_values(
+        ["team", "week", "gameId"]
+    ).reset_index(drop = True)
+
+    # Create pre-game averages
+    for feature in pregame_features:
+        df[f"pregame_{feature}"] = (
+            df.groupby("team")[feature].transform(
+                lambda x: x.expanding().mean().shift(1)
+            )
+        )
+
+    return df
 
 if __name__ == "__main__":
 
-    stats = transform_game_stats(2025)
+    stats = create_pregame_stats(2025)
 
-    stats.to_csv(
-        "data/processed/game_stats/game_stats_2025.csv",
-        index = False
-    )
+    stats.to_csv("data/processed/game_stats/pregame_stats_2025.csv")
 
     print(stats.shape)
-    print(stats.head())
+    print(stats.head(20))
