@@ -158,10 +158,15 @@ def get_season_game_team_stats(year, start_week = 1, end_week = 15):
 
 
 if __name__ == "__main__":
-    stats_2025 = get_season_game_team_stats(2025)
+    for year in range(2015, 2025): 
+        # Save advanced statistics
+        save_game_stats(year)
 
-    print(stats_2025.shape)
-    print(stats_2025["week"].value_counts().sort_index())
-    print(stats_2025["gameId"].nunique())
+        # Pull and save game statistics for the teams
+        stats = get_season_game_team_stats(year)
 
-    stats_2025.to_csv("data/raw/game_team_stats/game_team_stats_2025.csv", index = False)
+        print(stats.shape)
+        print(stats["week"].value_counts().sort_index())
+        print(stats["gameId"].nunique())
+
+        stats.to_csv(f"data/raw/game_team_stats/game_team_stats_{year}.csv", index = False)
