@@ -494,7 +494,6 @@ def create_location_stats(team_stats):
 
     return team_stats
 
-
 if __name__ == "__main__":
     games, game_team_stats = load_data(2025)
 
@@ -512,21 +511,21 @@ if __name__ == "__main__":
 
     team_stats = create_location_stats(team_stats)
 
-    print(team_stats[team_stats["team"] == "Kansas State"][
-        [
-            "startDate",
-            "homeAway",
-            "homeGamesBefore",
-            "homeWinsBefore",
-            "homeWinPctBefore",
-            "homePointsForAvgBefore",
-            "homePointsAgainstAvgBefore",
-            "awayGamesBefore",
-            "awayWinsBefore",
-            "awayWinPctBefore",
-            "awayPointsForAvgBefore",
-            "awayPointsAgainstAvgBefore"
-        ]
-    ].to_string(index = False))
+    # print(team_stats[team_stats["team"] == "Kansas State"][
+    #    [
+    #        "startDate",
+    #        "homeAway",
+    #        "homeGamesBefore",
+    #        "homeWinsBefore",
+    #        "homeWinPctBefore",
+    #        "homePointsForAvgBefore",
+    #        "homePointsAgainstAvgBefore",
+    #        "awayGamesBefore",
+    #        "awayWinsBefore",
+    #        "awayWinPctBefore",
+    #        "awayPointsForAvgBefore",
+    #        "awayPointsAgainstAvgBefore"
+    #    ]
+    #].to_string(index = False))
 
-    # team_stats.to_csv("data/processed/game_team_stats/game_team_stats_2025.csv")
+    team_stats.to_csv("data/processed/game_team_stats/game_team_stats_2025.csv")
