@@ -190,41 +190,25 @@ def clean_game_features(game_features):
 
 
 if __name__ == "__main__":
+    for year in range(2015, 2025):
+        path = (
+            f"data/processed/game_team_stats/game_team_stats_{year}.csv"
+        )
 
-    path = (
-        "data/processed/game_team_stats/game_team_stats_2025.csv"
-    )
+        team_stats = load_team_stats(path)
 
-    team_stats = load_team_stats(path)
+        validate_games(team_stats)
 
-    validate_games(team_stats)
+        home, away = create_game_level_data(
+            team_stats
+        )
 
-    home, away = create_game_level_data(
-        team_stats
-    )
+        game_features = merge_home_away(
+            home,
+            away
+        )
 
-    game_features = merge_home_away(
-        home,
-        away
-    )
+        game_features = clean_game_features(game_features)
 
-    game_features = clean_game_features(game_features)
-
-    print("\nCleaned game-level shape:")
-    print(game_features.shape)
-
-    print("\nColumns:")
-    for col in game_features.columns:
-        print(col)
-
-    print("\nMissing values:")
-    print(
-        game_features.isna().sum()
-        .sort_values(ascending=False)
-    )
-
-    print("\nData types:")
-    print(game_features.dtypes)
-
-    print("\nFirst game:")
-    print(game_features.iloc[0].to_dict())
+        print("\nCleaned game-level shape:")
+        print(game_features.shape)

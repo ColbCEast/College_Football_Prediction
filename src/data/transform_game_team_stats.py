@@ -121,6 +121,110 @@ def create_numeric_features(team_stats):
     return team_stats
 
 
+def ensure_stat_columns(team_stats):
+    # 2015 data seems to have less statistics than 2016 onward.
+    # To keep the schema consistent across seasons, add any missing
+    # statistics as NaN.
+
+    expected_stats = [
+        "rushingTDs",
+        "puntReturnYards",
+        "puntReturnTDs",
+        "puntReturns",
+        "passingTDs",
+        "kickReturnYards",
+        "kickReturnTDs",
+        "kickReturns",
+        "kickingPoints",
+        "interceptionYards",
+        "interceptionTDs",
+        "passesIntercepted",
+        "fumblesRecovered",
+        "totalFumbles",
+        "possessionTime",
+        "interceptions",
+        "fumblesLost",
+        "turnovers",
+        "totalPenaltiesYards",
+        "yardsPerRushAttempt",
+        "rushingAttempts",
+        "rushingYards",
+        "yardsPerPass",
+        "completionAttempts",
+        "netPassingYards",
+        "totalYards",
+        "fourthDownEff",
+        "thirdDownEff",
+        "firstDowns",
+        "tacklesForLoss",
+        "defensiveTDs",
+        "tackles",
+        "sacks",
+        "qbHurries",
+        "passesDeflected",
+    ]
+
+    for column in expected_stats:
+        if column not in team_stats.columns:
+            team_stats[column] = pd.NA
+
+    # Columns that should be numeric
+    numeric_stats = [
+        "points",
+        "rushingTDs",
+        "puntReturnYards",
+        "puntReturnTDs",
+        "puntReturns",
+        "passingTDs",
+        "kickReturnYards",
+        "kickReturnTDs",
+        "kickReturns",
+        "kickingPoints",
+        "interceptionYards",
+        "interceptionTDs",
+        "passesIntercepted",
+        "fumblesRecovered",
+        "totalFumbles",
+        "interceptions",
+        "fumblesLost",
+        "turnovers",
+        "yardsPerRushAttempt",
+        "rushingAttempts",
+        "rushingYards",
+        "yardsPerPass",
+        "netPassingYards",
+        "totalYards",
+        "firstDowns",
+        "tacklesForLoss",
+        "defensiveTDs",
+        "tackles",
+        "sacks",
+        "qbHurries",
+        "passesDeflected",
+        "completions",
+        "passAttempts",
+        "completionPct",
+        "thirdDownConversions",
+        "thirdDownAttempts",
+        "thirdDownPct",
+        "fourthDownConversions",
+        "fourthDownAttempts",
+        "fourthDownPct",
+        "penalties",
+        "penaltyYards",
+        "possessionSeconds",
+    ]
+
+    for column in numeric_stats:
+        if column in team_stats.columns:
+            team_stats[column] = pd.to_numeric(
+                team_stats[column],
+                errors="coerce"
+            )
+
+    return team_stats
+
+
 def create_pre_game_stats(team_stats):
 
     team_stats = team_stats.copy()
@@ -495,37 +599,25 @@ def create_location_stats(team_stats):
     return team_stats
 
 if __name__ == "__main__":
-    games, game_team_stats = load_data(2025)
+    for year in range (2015, 2025):
+        games, game_team_stats = load_data(year)
 
-    team_stats = merge_game_data(games, game_team_stats)
+        team_stats = merge_game_data(games, game_team_stats)
 
-    team_stats = create_game_outcomes(team_stats)
+        team_stats = create_game_outcomes(team_stats)
 
-    team_stats = sort_games(team_stats)
+        team_stats = sort_games(team_stats)
 
-    team_stats = create_numeric_features(team_stats)
+        team_stats = create_numeric_features(team_stats)
 
-    team_stats = create_pre_game_stats(team_stats)
+        team_stats = ensure_stat_columns(team_stats)
 
-    team_stats = create_recent_form_stats(team_stats)
+        team_stats = create_pre_game_stats(team_stats)
 
-    team_stats = create_location_stats(team_stats)
+        team_stats = create_recent_form_stats(team_stats)
 
-    # print(team_stats[team_stats["team"] == "Kansas State"][
-    #    [
-    #        "startDate",
-    #        "homeAway",
-    #        "homeGamesBefore",
-    #        "homeWinsBefore",
-    #        "homeWinPctBefore",
-    #        "homePointsForAvgBefore",
-    #        "homePointsAgainstAvgBefore",
-    #        "awayGamesBefore",
-    #        "awayWinsBefore",
-    #        "awayWinPctBefore",
-    #        "awayPointsForAvgBefore",
-    #        "awayPointsAgainstAvgBefore"
-    #    ]
-    #].to_string(index = False))
+        team_stats = create_location_stats(team_stats)
 
-    team_stats.to_csv("data/processed/game_team_stats/game_team_stats_2025.csv")
+        team_stats.to_csv(f"data/processed/game_team_stats/game_team_stats_{year}.csv")
+
+        print(f"{year} data: {team_stats.shape}")

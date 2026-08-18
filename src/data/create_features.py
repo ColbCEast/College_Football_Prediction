@@ -84,24 +84,9 @@ def create_matchup_dataset(year):
     return games
 
 if __name__ == "__main__":
-    games = create_matchup_dataset(2025)
+    for year in range(2015, 2025):
+        games = create_matchup_dataset(year)
 
-    games.to_csv("data/processed/features/features_2025.csv", index = False)
+        games.to_csv(f"data/processed/features/features_{year}.csv", index = False)
 
-    print("Shape: ", games.shape)
-
-    print("\nSelected columns:")
-    print(games[["id",
-                 "week",
-                 "homeTeam",
-                 "awayTeam",
-                 "home_pregame_offense_ppa",
-                 "away_pregame_offense_ppa",
-                 "home_pregame_defense_ppa",
-                 "away_pregame_defense_ppa"]].head(20))
-
-    print("\nMissing pre-game statistics:")
-    print(games[["home_pregame_offense_ppa",
-                 "away_pregame_offense_ppa",
-                 "home_pregame_defense_ppa",
-                 "away_pregame_defense_ppa"]].isna().sum())
+        print(f"{year} Shape: ", games.shape)
