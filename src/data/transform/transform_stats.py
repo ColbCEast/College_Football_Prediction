@@ -50,7 +50,8 @@ def transform_game_stats(year):
     # Combine everything
     df = pd.concat([df, offense, defense], axis = 1)
 
-    return df
+    # Save flattened data frame
+    df.to_csv(f"data/processed/game_stats/game_stats_{year}.csv", index = False)
 
 def create_pregame_stats(year):
     """
@@ -65,6 +66,23 @@ def create_pregame_stats(year):
     filepath = f"data/processed/game_stats/game_stats_{year}.csv"
 
     df = pd.read_csv(filepath)
+
+    # Load game dates so advanced statistics can be ordered
+    # chronologically rather than relying on CFBD week numbers
+    games_filepath = f"data/raw/games/games_{year}.csv"
+
+    games = pd.read_csv(games_filepath)
+
+    games = games[["id", "startDate"]].rename(
+        columns = {"id": "gameId"}
+    )
+
+    df = df.merge(games,
+                  on = "gameId",
+                  how = "left",
+                  validate = "many_to_one")
+
+    df["startDate"] = pd.to_datetime(df["startDate"])
 
     # Features calculated from games played prior to the current game.
 
@@ -144,13 +162,13 @@ def create_pregame_stats(year):
 
     # Sort chronologically within each team
     df = df.sort_values(
-        ["team", "week", "gameId"]
+        ["team", "startDate", "gameId"]
     ).reset_index(drop = True)
 
     # Create pre-game averages
     for feature in pregame_features:
         df[f"pregame_{feature}"] = (
-            df.groupby("team")[feature].transform(
+            df.groupby(["season", "team"])[feature].transform(
                 lambda x: x.expanding().mean().shift(1)
             )
         )
@@ -158,10 +176,12 @@ def create_pregame_stats(year):
     return df
 
 if __name__ == "__main__":
+    for year in range(2015, 2025):
+        transform_game_stats(year)
 
-    stats = create_pregame_stats(2025)
+        stats = create_pregame_stats(year)
 
-    stats.to_csv("data/processed/game_stats/pregame_stats_2025.csv")
-
-    print(stats.shape)
-    print(stats.head(20))
+        stats.to_csv(f"data/processed/game_stats/pregame_stats_{year}.csv", index = False)
+        
+        print(stats.shape)
+        print(stats.head(20))
