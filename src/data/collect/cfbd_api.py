@@ -147,7 +147,7 @@ def get_game_team_stats(year, week):
 
     return pd.DataFrame(rows)
 
-def get_season_game_team_stats(year, start_week = 1, end_week = 15):
+def get_season_game_team_stats(year, start_week = 1, end_week = 16):
     all_stats = []
 
     for week in range(start_week, end_week + 1):
@@ -156,17 +156,34 @@ def get_season_game_team_stats(year, start_week = 1, end_week = 15):
 
     return pd.concat(all_stats, ignore_index = True)
 
+def add_week_to_season_game_team_stats(year, week):
+    path = f"data/raw/game_team_stats/game_team_stats_{year}.csv"
+
+    existing_stats = pd.read_csv(path)
+
+    week_stats = get_game_team_stats(year, week)
+
+    updated_stats = pd.concat(
+        [existing_stats, week_stats],
+        ignore_index=True
+    )
+
+    updated_stats = updated_stats.drop_duplicates(
+        subset=["gameId", "team"],
+        keep="first"
+    )
+
+    updated_stats.to_csv(
+        path,
+        index=False
+    )
+
+    print(f"{year} Week {week} added")
+    print(f"Existing rows: {len(existing_stats)}")
+    print(f"Week {week} rows: {len(week_stats)}")
+    print(f"Updated rows: {len(updated_stats)}")
+
 
 if __name__ == "__main__":
-    for year in range(2015, 2025): 
-        # Save advanced statistics
-        save_game_stats(year)
-
-        # Pull and save game statistics for the teams
-        stats = get_season_game_team_stats(year)
-
-        print(stats.shape)
-        print(stats["week"].value_counts().sort_index())
-        print(stats["gameId"].nunique())
-
-        stats.to_csv(f"data/raw/game_team_stats/game_team_stats_{year}.csv", index = False)
+    for year in [2020, 2024, 2025]:
+        add_week_to_season_game_team_stats(year, 16)
