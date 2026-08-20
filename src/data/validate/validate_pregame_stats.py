@@ -7,7 +7,7 @@ from pathlib import Path
 # Configuration
 # ============================================================
 
-YEAR = 2025
+YEAR = 2015
 
 PREGAME_STATS_PATH = Path(
     f"data/processed/game_stats/pregame_stats_{YEAR}.csv"
@@ -706,7 +706,7 @@ if len(failed_checks) == 0:
     )
 
     print(
-        "\nThe 2025 advanced pregame statistics "
+        f"\nThe {YEAR} advanced pregame statistics "
         "appear to be correctly calculated without "
         "current-game leakage."
     )

@@ -1,5 +1,8 @@
 import pandas as pd
 
+# This script is to convert pregame advanced statistics
+# into useable features for modeling
+
 model_features = [
     "pregame_offense_ppa",
     "pregame_offense_successRate",
