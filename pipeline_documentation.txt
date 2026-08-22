@@ -1,0 +1,19 @@
+This file will be used to document 
+basic pipeline structure and organization.
+
+
+1. API Layer
+
+All API endpoints are housed within
+src\data\api\cfbd_api.py
+
+This file contains functions that are
+necessary to pull games, game statistics,
+advanced statistics, and will be where
+future API functionality is added.
+
+This is the foundational infrastructure of
+the project. 
+
+This file is also where other API endpoints
+will be added if necessary in the future.

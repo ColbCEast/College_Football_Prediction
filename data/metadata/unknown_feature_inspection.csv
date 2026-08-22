@@ -1,0 +1,189 @@
+column,current_category,predictive_safe_current,target_candidate_current,leakage_risk_current,automatic_suggestion,feature_context
+points_home,unknown,False,False,review,current_game,STAT=points
+rushingTDs_home,unknown,False,False,review,current_game,STAT=TDs
+puntReturnYards_home,unknown,False,False,review,current_game,STAT=yards
+puntReturnTDs_home,unknown,False,False,review,current_game,STAT=TDs
+puntReturns_home,unknown,False,False,review,current_game,STAT=returns
+passingTDs_home,unknown,False,False,review,current_game,STAT=TDs
+kickReturnYards_home,unknown,False,False,review,current_game,STAT=yards
+kickReturnTDs_home,unknown,False,False,review,current_game,STAT=TDs
+kickReturns_home,unknown,False,False,review,current_game,STAT=returns
+kickingPoints_home,unknown,False,False,review,current_game,STAT=points
+interceptionYards_home,unknown,False,False,review,current_game,STAT=yards
+interceptionTDs_home,unknown,False,False,review,current_game,STAT=TDs
+passesIntercepted_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+fumblesRecovered_home,unknown,False,False,review,current_game,STAT=fumbles
+totalFumbles_home,unknown,False,False,review,current_game,STAT=fumbles
+possessionTime_home,unknown,False,False,review,current_game,STAT=possession
+interceptions_home,unknown,False,False,review,current_game,STAT=interceptions
+fumblesLost_home,unknown,False,False,review,current_game,STAT=fumbles
+turnovers_home,unknown,False,False,review,current_game,STAT=turnovers
+totalPenaltiesYards_home,unknown,False,False,review,current_game,"STAT=yards, penalties"
+yardsPerRushAttempt_home,unknown,False,False,review,current_game,STAT=yards
+rushingAttempts_home,unknown,False,False,review,current_game,STAT=attempts
+rushingYards_home,unknown,False,False,review,current_game,STAT=yards
+yardsPerPass_home,unknown,False,False,review,current_game,STAT=yards
+completionAttempts_home,unknown,False,False,review,current_game,STAT=attempts
+netPassingYards_home,unknown,False,False,review,current_game,STAT=yards
+totalYards_home,unknown,False,False,review,current_game,STAT=yards
+fourthDownEff_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+thirdDownEff_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+firstDowns_home,unknown,False,False,review,current_game,STAT=downs
+tacklesForLoss_home,unknown,False,False,review,current_game,STAT=tackles
+defensiveTDs_home,unknown,False,False,review,current_game,STAT=TDs
+tackles_home,unknown,False,False,review,current_game,STAT=tackles
+sacks_home,unknown,False,False,review,current_game,STAT=sacks
+qbHurries_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+passesDeflected_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+homePoints_home,unknown,False,False,review,current_game,HOME | STAT=points
+pointsFor_home,unknown,False,False,review,current_game,STAT=points
+pointsAgainst_home,unknown,False,False,review,current_game,STAT=points
+pointDifferential_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+win_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+completions_home,unknown,False,False,review,current_game,STAT=completions
+passAttempts_home,unknown,False,False,review,current_game,STAT=attempts
+completionPct_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+thirdDownConversions_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+thirdDownAttempts_home,unknown,False,False,review,current_game,STAT=attempts
+thirdDownPct_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+fourthDownConversions_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+fourthDownAttempts_home,unknown,False,False,review,current_game,STAT=attempts
+fourthDownPct_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+penalties_home,unknown,False,False,review,current_game,STAT=penalties
+penaltyYards_home,unknown,False,False,review,current_game,STAT=yards
+possessionSeconds_home,unknown,False,False,review,current_game,STAT=possession
+pointsForAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointsAgainstAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointDifferentialAvgLast3_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+rushingYardsAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+netPassingYardsAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+totalYardsAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+sacksAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=sacks
+qbHurriesAvgLast3_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+passesDeflectedAvgLast3_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+tacklesForLossAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=tackles
+turnoversAvgLast3_home,unknown,False,False,review,current_game,AVERAGE | STAT=turnovers
+pointsForAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointsAgainstAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointDifferentialAvgLast5_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+rushingYardsAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+netPassingYardsAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+totalYardsAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+sacksAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=sacks
+qbHurriesAvgLast5_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+passesDeflectedAvgLast5_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+tacklesForLossAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=tackles
+turnoversAvgLast5_home,unknown,False,False,review,current_game,AVERAGE | STAT=turnovers
+winPctLast3_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+winPctLast5_home,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+points_away,unknown,False,False,review,current_game,STAT=points
+rushingTDs_away,unknown,False,False,review,current_game,STAT=TDs
+puntReturnYards_away,unknown,False,False,review,current_game,STAT=yards
+puntReturnTDs_away,unknown,False,False,review,current_game,STAT=TDs
+puntReturns_away,unknown,False,False,review,current_game,STAT=returns
+passingTDs_away,unknown,False,False,review,current_game,STAT=TDs
+kickReturnYards_away,unknown,False,False,review,current_game,STAT=yards
+kickReturnTDs_away,unknown,False,False,review,current_game,STAT=TDs
+kickReturns_away,unknown,False,False,review,current_game,STAT=returns
+kickingPoints_away,unknown,False,False,review,current_game,STAT=points
+interceptionYards_away,unknown,False,False,review,current_game,STAT=yards
+interceptionTDs_away,unknown,False,False,review,current_game,STAT=TDs
+passesIntercepted_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+fumblesRecovered_away,unknown,False,False,review,current_game,STAT=fumbles
+totalFumbles_away,unknown,False,False,review,current_game,STAT=fumbles
+possessionTime_away,unknown,False,False,review,current_game,STAT=possession
+interceptions_away,unknown,False,False,review,current_game,STAT=interceptions
+fumblesLost_away,unknown,False,False,review,current_game,STAT=fumbles
+turnovers_away,unknown,False,False,review,current_game,STAT=turnovers
+totalPenaltiesYards_away,unknown,False,False,review,current_game,"STAT=yards, penalties"
+yardsPerRushAttempt_away,unknown,False,False,review,current_game,STAT=yards
+rushingAttempts_away,unknown,False,False,review,current_game,STAT=attempts
+rushingYards_away,unknown,False,False,review,current_game,STAT=yards
+yardsPerPass_away,unknown,False,False,review,current_game,STAT=yards
+completionAttempts_away,unknown,False,False,review,current_game,STAT=attempts
+netPassingYards_away,unknown,False,False,review,current_game,STAT=yards
+totalYards_away,unknown,False,False,review,current_game,STAT=yards
+fourthDownEff_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+thirdDownEff_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+firstDowns_away,unknown,False,False,review,current_game,STAT=downs
+tacklesForLoss_away,unknown,False,False,review,current_game,STAT=tackles
+defensiveTDs_away,unknown,False,False,review,current_game,STAT=TDs
+tackles_away,unknown,False,False,review,current_game,STAT=tackles
+sacks_away,unknown,False,False,review,current_game,STAT=sacks
+qbHurries_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+passesDeflected_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+awayPoints_away,unknown,False,False,review,current_game,AWAY | STAT=points
+pointsFor_away,unknown,False,False,review,current_game,STAT=points
+pointsAgainst_away,unknown,False,False,review,current_game,STAT=points
+pointDifferential_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+win_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+completions_away,unknown,False,False,review,current_game,STAT=completions
+passAttempts_away,unknown,False,False,review,current_game,STAT=attempts
+completionPct_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+thirdDownConversions_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+thirdDownAttempts_away,unknown,False,False,review,current_game,STAT=attempts
+thirdDownPct_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+fourthDownConversions_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+fourthDownAttempts_away,unknown,False,False,review,current_game,STAT=attempts
+fourthDownPct_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+penalties_away,unknown,False,False,review,current_game,STAT=penalties
+penaltyYards_away,unknown,False,False,review,current_game,STAT=yards
+possessionSeconds_away,unknown,False,False,review,current_game,STAT=possession
+pointsForAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointsAgainstAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointDifferentialAvgLast3_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+rushingYardsAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+netPassingYardsAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+totalYardsAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+sacksAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=sacks
+qbHurriesAvgLast3_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+passesDeflectedAvgLast3_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+tacklesForLossAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=tackles
+turnoversAvgLast3_away,unknown,False,False,review,current_game,AVERAGE | STAT=turnovers
+pointsForAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointsAgainstAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=points
+pointDifferentialAvgLast5_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+rushingYardsAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+netPassingYardsAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+totalYardsAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=yards
+sacksAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=sacks
+qbHurriesAvgLast5_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+passesDeflectedAvgLast5_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AVERAGE
+tacklesForLossAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=tackles
+turnoversAvgLast5_away,unknown,False,False,review,current_game,AVERAGE | STAT=turnovers
+winPctLast3_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+winPctLast5_away,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+startTimeTBD,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+neutralSite,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+conferenceGame,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+attendance,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+venueId,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+venue,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+homeId,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+homeClassification,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+homeConference,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+homeLineScores,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+homePostgameWinProbability,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+homePostgameElo,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+awayId,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+awayClassification,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+awayConference,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+awayLineScores,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+awayPostgameWinProbability,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+awayPostgameElo,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+excitementIndex,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+highlights,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+notes,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+playoff,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,NO_OBVIOUS_CONTEXT
+home_pregame_offense_ppa,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+home_pregame_offense_successRate,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+home_pregame_offense_explosiveness,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+home_pregame_defense_ppa,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+home_pregame_defense_successRate,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+home_pregame_defense_explosiveness,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,HOME
+away_pregame_offense_ppa,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+away_pregame_offense_successRate,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+away_pregame_offense_explosiveness,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+away_pregame_defense_ppa,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+away_pregame_defense_successRate,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
+away_pregame_defense_explosiveness,unknown,False,False,review,NO_AUTOMATIC_SUGGESTION,AWAY
