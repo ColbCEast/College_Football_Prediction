@@ -7,7 +7,7 @@ from pathlib import Path
 # Configuration
 # ============================================================
 
-YEAR = 2015
+YEAR = 2025
 
 PREGAME_STATS_PATH = Path(
     f"data/processed/game_stats/pregame_stats_{YEAR}.csv"

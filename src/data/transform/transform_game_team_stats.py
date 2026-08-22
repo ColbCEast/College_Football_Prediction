@@ -599,7 +599,7 @@ def create_location_stats(team_stats):
     return team_stats
 
 if __name__ == "__main__":
-    for year in range (2015, 2025):
+    for year in range (2015, 2026):
         games, game_team_stats = load_data(year)
 
         team_stats = merge_game_data(games, game_team_stats)

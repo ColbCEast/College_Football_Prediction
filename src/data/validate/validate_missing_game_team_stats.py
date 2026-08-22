@@ -10,8 +10,7 @@ def check_game_team_stats(year, week, game_id):
 
     params = {
         "year": year,
-        "week": week,
-        "seasonType": "regular"
+        "week": week
     }
 
     print("=" * 70)
