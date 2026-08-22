@@ -4,8 +4,7 @@ basic pipeline structure and organization.
 
 1. API Layer
 
-All API endpoints are housed within
-src\data\api\cfbd_api.py
+src\data\api
 
 This file contains functions that are
 necessary to pull games, game statistics,
@@ -17,3 +16,131 @@ the project.
 
 This file is also where other API endpoints
 will be added if necessary in the future.
+
+1a. Raw Data Layer
+
+data\raw
+
+The API endpoints export CSV files to the 
+folder and organize it into folders
+by API endpoint.
+
+This folder stores only raw API data and does
+not have any transformations applied after 
+being pulled.
+
+1b. Raw Data Validation
+
+src\data\validate
+
+This layer runs validation checks on raw data
+files to ensure that the API is functioning
+properly. This includes the following files:
+
+validate_raw_game_team_stats.py
+validate_game_team_stats_coverage.py
+validate_missing_game_team_stats.py
+audit_game_stats.py
+validate_advanced_coverage.py
+
+
+2. Transformation Layer
+
+src\data\transform
+
+Multiple python files are included within this
+layer to transform various datasets from the
+endpoints. This includes the following:
+
+clean_games.py: Clean and reformat game data
+transform_game_team_stats.py: Clean and transform game-level statistics
+transform_stats.py: Clean and transform advanced statistics
+
+2a. Processed Data Layer
+
+data\processed
+
+This layer has differing folders depending on 
+the data type and the script that it was created
+from. These files include newly engineered 
+features such as  pregame statistics, 
+averages, and ratings.
+
+2b. Transformation Validation Layer
+
+src\data\validate
+
+These files are used to validate the processed
+data coming through the transformation layer to
+ensure that the initial cleaning and transformation
+of the data is working correctly. Files within
+this layer include:
+
+validate_pregame_stats.py
+
+
+3. Feature Creation
+
+src\data\transform
+
+This layer creates features from the validated 
+processed pregame and game-level data that can
+be used for machine learning. This includes:
+
+create_game_features.py
+create_final_features.py
+
+3a. Feature Data Layer
+
+data\processed
+
+This is the output from the feature creation 
+files. All folders in this layer are labeled
+with "feature" in the title
+
+3b. Feature Validation
+
+src\data\validate
+
+This layer is used to ensure that final feature
+datasets are structurally correct and set up
+in a way that makes sense for the modeling
+layer. This includes:
+
+validate_final_features.py
+
+
+4. Metadata/Model Preparation Layer
+
+src\data\classify
+
+This layer is used to create metadata that will
+be utilized in the creation of model-specific
+feature sets. It classifies what each column is
+intended to do, if it is a data leakage risk,
+and if it is safe to feed into a prediction model.
+It includes:
+
+create_final_feature_classification.py
+
+4a. Metadata Layer
+
+data\metadata
+
+The output from the classification for features
+is stored so that it can be easily accessed
+and used to simplify the creation of target and
+feature sets during the modeling phase.
+
+4b. Metadata Validation 
+
+src\data\validate
+
+These validation checks ensure that each 
+variable was correctly classified and labeled
+as either prediction safe or unsafe prior to 
+moving forward with modeling. This includes:
+
+validate_final_feature_classification.py
+validate_predictive_safety.py
+validate_model_data.py
