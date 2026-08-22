@@ -1,572 +1,758 @@
 import pandas as pd
-from pathlib import Path
 
 
 # ============================================================
-# PATHS
+# Configuration
 # ============================================================
 
-GAMES_DIR = Path("data/raw/games")
-GAME_FEATURES_DIR = Path("data/processed/game_features")
-ADVANCED_FEATURES_DIR = Path("data/processed/features")
-FINAL_FEATURES_DIR = Path("data/processed/final_features")
+START_YEAR = 2015
+END_YEAR = 2025
+
+GAME_FEATURE_PATH = (
+    "data/processed/game_features/game_features_{year}.csv"
+)
+
+ADVANCED_FEATURE_PATH = (
+    "data/processed/features/features_{year}.csv"
+)
+
+OUTPUT_PATH = (
+    "data/processed/final_features/final_features_{year}.csv"
+)
 
 
 # ============================================================
-# LOAD DATA
+# Known CFBD data limitations
 # ============================================================
 
-def load_data(year):
-    """
-    Load original games, game-level features, and advanced
-    statistics for a season.
-    """
+# 2016 contains one advanced-stat record that has no
+# corresponding game-level feature record.
+#
+# This game was investigated separately and confirmed to be
+# a CFBD source-data limitation.
+KNOWN_ADVANCED_ONLY_IDS = {
+    2016: {400868914}
+}
 
-    games_path = GAMES_DIR / f"games_{year}.csv"
 
-    game_features_path = (
-        GAME_FEATURES_DIR / f"game_features_{year}.csv"
+# ============================================================
+# Load data
+# ============================================================
+
+def load_feature_data(year):
+
+    game_features = pd.read_csv(
+        GAME_FEATURE_PATH.format(year=year)
     )
 
-    advanced_features_path = (
-        ADVANCED_FEATURES_DIR / f"features_{year}.csv"
+    advanced_features = pd.read_csv(
+        ADVANCED_FEATURE_PATH.format(year=year)
     )
 
-    games = pd.read_csv(games_path)
-    game_features = pd.read_csv(game_features_path)
-    advanced_features = pd.read_csv(advanced_features_path)
-
-    return games, game_features, advanced_features
+    return game_features, advanced_features
 
 
 # ============================================================
-# VALIDATE INPUTS
+# Validate unique game IDs
 # ============================================================
 
-def validate_input_data(
-    games,
-    game_features,
-    advanced_features,
-    year
+def validate_unique_game_ids(
+    df,
+    dataset_name,
+    id_column
 ):
 
-    print(f"\n{'=' * 70}")
-    print(f"VALIDATING INPUT DATA: {year}")
-    print(f"{'=' * 70}")
-
-    # --------------------------------------------------------
-    # Check game IDs
-    # --------------------------------------------------------
-
-    if "id" not in games.columns:
-        raise ValueError(
-            f"Original games for {year} are missing 'id'."
-        )
-
-    if "gameId" not in game_features.columns:
-        raise ValueError(
-            f"Game-level features for {year} are missing 'gameId'."
-        )
-
-    if "id" not in advanced_features.columns:
-        raise ValueError(
-            f"Advanced features for {year} are missing 'id'."
-        )
-
-    # --------------------------------------------------------
-    # Check classifications
-    # --------------------------------------------------------
-
-    required_columns = [
-        "homeClassification",
-        "awayClassification"
-    ]
-
-    missing = [
-        column
-        for column in required_columns
-        if column not in games.columns
-    ]
-
-    if missing:
-        raise ValueError(
-            f"Original games for {year} are missing: {missing}"
-        )
-
-    # --------------------------------------------------------
-    # Check duplicate IDs
-    # --------------------------------------------------------
-
-    game_duplicates = games["id"].duplicated().sum()
-
-    game_feature_duplicates = (
-        game_features["gameId"].duplicated().sum()
+    duplicate_games = (
+        df[id_column]
+        .value_counts()
+        .loc[lambda x: x > 1]
     )
 
-    advanced_duplicates = (
-        advanced_features["id"].duplicated().sum()
-    )
-
-    print(f"Original games: {len(games)}")
-    print(f"Game-level features: {len(game_features)}")
-    print(f"Advanced statistics: {len(advanced_features)}")
-
-    print(f"Duplicate game IDs: {game_duplicates}")
+    print(f"\n{dataset_name}:")
+    print(f"  Rows: {len(df)}")
     print(
-        f"Duplicate game-level IDs: "
-        f"{game_feature_duplicates}"
+        f"  Unique games: "
+        f"{df[id_column].nunique()}"
     )
     print(
-        f"Duplicate advanced IDs: "
-        f"{advanced_duplicates}"
+        f"  Duplicate game IDs: "
+        f"{len(duplicate_games)}"
     )
 
-    if game_duplicates > 0:
-        raise ValueError(
-            f"Original games contain duplicate IDs for {year}."
-        )
+    if len(duplicate_games) > 0:
 
-    if game_feature_duplicates > 0:
-        raise ValueError(
-            f"Game-level features contain duplicate gameIds "
-            f"for {year}."
-        )
+        print("  Duplicate game IDs:")
+        print(duplicate_games)
 
-    if advanced_duplicates > 0:
         raise ValueError(
-            f"Advanced features contain duplicate IDs "
-            f"for {year}."
+            f"{dataset_name} contains duplicate "
+            f"{id_column} values."
         )
 
 
 # ============================================================
-# CREATE OPTION B GAME UNIVERSE
+# Validate game ID relationship
 # ============================================================
 
-def create_option_b_games(games):
-    """
-    Keep every game involving at least one FBS team.
+def validate_game_id_match(
+    year,
+    game_features,
+    advanced_features
+):
 
-    FBS-FBS -> KEEP
-    FBS-FCS -> KEEP
-    FCS-FBS -> KEEP
-    FCS-FCS -> DROP
-    """
-
-    fbs_mask = (
-        (games["homeClassification"] == "fbs")
-        |
-        (games["awayClassification"] == "fbs")
+    game_ids = set(
+        game_features["gameId"]
     )
 
-    option_b_games = games.loc[fbs_mask].copy()
-
-    return option_b_games
-
-
-# ============================================================
-# MERGE GAME-LEVEL FEATURES
-# ============================================================
-
-def merge_game_features(option_b_games, game_features, year):
-    """
-    Merge game-level features onto the Option B game universe.
-    """
-
-    game_features_for_merge = game_features.copy()
-
-    merged = option_b_games.merge(
-        game_features_for_merge,
-        left_on="id",
-        right_on="gameId",
-        how="left",
-        validate="one_to_one",
-        suffixes=("", "_game_features")
+    advanced_ids = set(
+        advanced_features["id"]
     )
 
-    # Check that every eligible game received
-    # game-level features.
-    missing = merged["gameId"].isna().sum()
+    only_game_features = (
+        game_ids - advanced_ids
+    )
 
-    if missing > 0:
+    only_advanced_features = (
+        advanced_ids - game_ids
+    )
 
-        missing_games = merged.loc[
-            merged["gameId"].isna(),
-            [
-                "id",
-                "homeTeam",
-                "awayTeam"
-            ]
-        ]
+    matching_ids = (
+        game_ids & advanced_ids
+    )
 
-        print("\nGames missing game-level features:")
+    known_advanced_only = (
+        KNOWN_ADVANCED_ONLY_IDS.get(
+            year,
+            set()
+        )
+    )
+
+    unexplained_advanced_only = (
+        only_advanced_features
+        - known_advanced_only
+    )
+
+    print("\nGame ID matching:")
+
+    print(
+        f"  Matching game IDs: "
+        f"{len(matching_ids)}"
+    )
+
+    print(
+        f"  Only in game features: "
+        f"{len(only_game_features)}"
+    )
+
+    print(
+        f"  Only in advanced features: "
+        f"{len(only_advanced_features)}"
+    )
+
+    # --------------------------------------------------------
+    # Game-level records without advanced features
+    #
+    # Beginning in 2022, this is expected because CFBD
+    # includes additional non-FBS games.
+    # --------------------------------------------------------
+
+    if only_game_features:
+
+        if year >= 2022:
+
+            print(
+                "\n  EXPECTED: Game-level dataset "
+                "contains additional non-FBS games."
+            )
+
+        else:
+
+            print(
+                "\n  UNEXPECTED: Game-level games "
+                "are missing advanced features."
+            )
+
+            print(
+                sorted(only_game_features)
+            )
+
+            raise ValueError(
+                f"{year}: Unexpected game IDs only "
+                f"in game-level features."
+            )
+
+    # --------------------------------------------------------
+    # Advanced records without game-level features
+    # --------------------------------------------------------
+
+    if known_advanced_only:
+
         print(
-            missing_games.to_string(index=False)
+            "\n  EXPECTED: Known CFBD source-data "
+            "limitation."
+        )
+
+        print(
+            "  Known advanced-only IDs:",
+            sorted(known_advanced_only)
+        )
+
+    if unexplained_advanced_only:
+
+        print(
+            "\n  ERROR: Unexplained advanced-only "
+            "game IDs:"
+        )
+
+        print(
+            sorted(unexplained_advanced_only)
         )
 
         raise ValueError(
-            f"{missing} Option B games are missing "
-            f"game-level features in {year}."
+            f"{year}: Advanced features contain "
+            f"unexpected game IDs."
         )
 
-    return merged
+    print(
+        "\n  PASS: Game ID relationship is "
+        "consistent with expected CFBD coverage."
+    )
 
 
 # ============================================================
-# MERGE ADVANCED FEATURES
+# Validate game information
 # ============================================================
 
-def merge_advanced_features(
+def validate_game_information(
     game_features,
-    advanced_features,
-    year
+    advanced_features
 ):
-    """
-    Merge advanced statistics onto the game-level dataset.
-    """
 
-    advanced_for_merge = (
+    game_info = game_features[
+        [
+            "gameId",
+            "homeTeam",
+            "awayTeam"
+        ]
+    ].copy()
+
+    advanced_info = advanced_features[
+        [
+            "id",
+            "homeTeam",
+            "awayTeam"
+        ]
+    ].copy()
+
+    advanced_info = advanced_info.rename(
+        columns={
+            "id": "gameId"
+        }
+    )
+
+    comparison = game_info.merge(
+        advanced_info,
+        on="gameId",
+        how="inner",
+        suffixes=(
+            "_game",
+            "_advanced"
+        ),
+        validate="one_to_one"
+    )
+
+    home_mismatches = comparison[
+        comparison["homeTeam_game"]
+        != comparison["homeTeam_advanced"]
+    ]
+
+    away_mismatches = comparison[
+        comparison["awayTeam_game"]
+        != comparison["awayTeam_advanced"]
+    ]
+
+    print("\nGame information validation:")
+
+    print(
+        f"  Home team mismatches: "
+        f"{len(home_mismatches)}"
+    )
+
+    print(
+        f"  Away team mismatches: "
+        f"{len(away_mismatches)}"
+    )
+
+    if len(home_mismatches) > 0:
+
+        print(
+            "\n  Home team mismatches:"
+        )
+
+        print(home_mismatches)
+
+        raise ValueError(
+            "Home team mismatch detected."
+        )
+
+    if len(away_mismatches) > 0:
+
+        print(
+            "\n  Away team mismatches:"
+        )
+
+        print(away_mismatches)
+
+        raise ValueError(
+            "Away team mismatch detected."
+        )
+
+    print(
+        "  PASS: Game information matches."
+    )
+
+
+# ============================================================
+# Remove known advanced-only records
+# ============================================================
+
+def remove_known_exceptions(
+    year,
+    advanced_features
+):
+
+    known_ids = KNOWN_ADVANCED_ONLY_IDS.get(
+        year,
+        set()
+    )
+
+    if not known_ids:
+        return advanced_features
+
+    original_rows = len(
         advanced_features
-        .rename(columns={"id": "gameId"})
+    )
+
+    advanced_features = (
+        advanced_features[
+            ~advanced_features["id"].isin(
+                known_ids
+            )
+        ]
         .copy()
     )
 
-    merged = game_features.merge(
-        advanced_for_merge,
-        on="gameId",
-        how="left",
-        validate="one_to_one",
-        suffixes=("", "_advanced")
+    removed_rows = (
+        original_rows
+        - len(advanced_features)
     )
 
-    return merged
+    print(
+        "\nRemoved known CFBD exceptions:"
+    )
+
+    print(
+        f"  Rows removed: {removed_rows}"
+    )
+
+    print(
+        f"  Game IDs: {sorted(known_ids)}"
+    )
+
+    return advanced_features
 
 
 # ============================================================
-# VALIDATE OPTION B
+# Validate final merge
 # ============================================================
 
-def validate_final_merge(
-    option_b_games,
-    final_features,
-    advanced_features,
-    year
+def create_final_features(
+    year,
+    game_features,
+    advanced_features
 ):
 
-    print(f"\n{'=' * 70}")
-    print(f"VALIDATING FINAL MERGE: {year}")
-    print(f"{'=' * 70}")
-
     # --------------------------------------------------------
-    # Row counts
+    # Remove known CFBD exception
     # --------------------------------------------------------
 
-    print("\nRow counts:")
+    advanced_features = (
+        remove_known_exceptions(
+            year,
+            advanced_features
+        )
+    )
 
-    print(
-        f"  Option B games: "
-        f"{len(option_b_games)}"
+    # --------------------------------------------------------
+    # Rename advanced ID to gameId
+    # --------------------------------------------------------
+
+    advanced_features = (
+        advanced_features.rename(
+            columns={
+                "id": "gameId"
+            }
+        )
+    )
+
+    # --------------------------------------------------------
+    # Identify overlapping columns
+    # --------------------------------------------------------
+
+    game_columns = set(
+        game_features.columns
+    )
+
+    advanced_columns = set(
+        advanced_features.columns
+    )
+
+    overlapping_columns = (
+        game_columns
+        & advanced_columns
+    )
+
+    overlapping_columns.discard(
+        "gameId"
     )
 
     print(
-        f"  Final features: "
-        f"{len(final_features)}"
+        "\nOverlapping columns:"
     )
 
-    if len(final_features) != len(option_b_games):
+    print(
+        f"  {len(overlapping_columns)}"
+        " columns"
+    )
+
+    if overlapping_columns:
+
+        for column in sorted(
+            overlapping_columns
+        ):
+
+            print(
+                f"  {column}"
+            )
+
+    # --------------------------------------------------------
+    # Remove duplicated metadata from advanced features
+    #
+    # Game-level features are our authoritative source for
+    # these columns.
+    # --------------------------------------------------------
+
+    advanced_columns_to_drop = (
+        sorted(overlapping_columns)
+    )
+
+    advanced_features = (
+        advanced_features.drop(
+            columns=advanced_columns_to_drop
+        )
+    )
+
+    # --------------------------------------------------------
+    # Perform final one-to-one merge
+    # --------------------------------------------------------
+
+    final_features = game_features.merge(
+        advanced_features,
+        on="gameId",
+        how="inner",
+        validate="one_to_one"
+    )
+
+    # --------------------------------------------------------
+    # Validate merge row count
+    #
+    # IMPORTANT:
+    #
+    # The final dataset should contain only games for which
+    # advanced features exist.
+    #
+    # Therefore, beginning in 2022, this will be smaller than
+    # game_features because non-FBS games are intentionally
+    # excluded.
+    # --------------------------------------------------------
+
+    expected_rows = len(
+        advanced_features
+    )
+
+    actual_rows = len(
+        final_features
+    )
+
+    print("\nFinal merge:")
+
+    print(
+        f"  Game-level rows: "
+        f"{len(game_features)}"
+    )
+
+    print(
+        f"  Advanced feature rows: "
+        f"{len(advanced_features)}"
+    )
+
+    print(
+        f"  Final feature rows: "
+        f"{actual_rows}"
+    )
+
+    print(
+        f"  Expected final rows: "
+        f"{expected_rows}"
+    )
+
+    if actual_rows != expected_rows:
 
         raise ValueError(
-            f"Final row count does not match Option B "
-            f"game count for {year}."
+            "Final merge did not preserve "
+            "all advanced feature rows."
         )
-
-    # --------------------------------------------------------
-    # Check FCS-FCS
-    # --------------------------------------------------------
-
-    fcs_fcs = (
-        (final_features["homeClassification"] != "fbs")
-        &
-        (final_features["awayClassification"] != "fbs")
-    ).sum()
 
     print(
-        f"  FCS-FCS games remaining: "
-        f"{fcs_fcs}"
+        "  PASS: Final merge preserved "
+        "all advanced feature rows."
     )
 
-    if fcs_fcs > 0:
+    return final_features
 
-        raise ValueError(
-            f"FCS-FCS games remain in final dataset "
-            f"for {year}."
-        )
+
+# ============================================================
+# Validate final dataset
+# ============================================================
+
+def validate_final_dataset(
+    final_features
+):
+
+    print("\nFinal dataset validation:")
 
     # --------------------------------------------------------
-    # Check duplicate IDs
+    # Unique game IDs
     # --------------------------------------------------------
 
-    duplicates = (
+    duplicate_games = (
         final_features["gameId"]
-        .duplicated()
+        .value_counts()
+        .loc[lambda x: x > 1]
+    )
+
+    print(
+        f"  Rows: {len(final_features)}"
+    )
+
+    print(
+        f"  Unique games: "
+        f"{final_features['gameId'].nunique()}"
+    )
+
+    print(
+        f"  Duplicate game IDs: "
+        f"{len(duplicate_games)}"
+    )
+
+    if len(duplicate_games) > 0:
+
+        raise ValueError(
+            "Final dataset contains duplicate "
+            "game IDs."
+        )
+
+    # --------------------------------------------------------
+    # Missing game IDs
+    # --------------------------------------------------------
+
+    missing_game_ids = (
+        final_features["gameId"]
+        .isna()
         .sum()
     )
 
     print(
-        f"  Duplicate gameIds: "
-        f"{duplicates}"
+        f"  Missing game IDs: "
+        f"{missing_game_ids}"
     )
 
-    if duplicates > 0:
+    if missing_game_ids > 0:
 
         raise ValueError(
-            f"Duplicate gameIds detected in final "
-            f"dataset for {year}."
+            "Final dataset contains missing "
+            "game IDs."
         )
-
-    # --------------------------------------------------------
-    # Determine advanced-stat columns
-    # --------------------------------------------------------
-
-    advanced_columns = [
-        column
-        for column in advanced_features.columns
-        if column != "id"
-    ]
-
-    # --------------------------------------------------------
-    # Check missing advanced statistics
-    # --------------------------------------------------------
-
-    missing_advanced = (
-        final_features[advanced_columns]
-        .isna()
-        .all(axis=1)
-    )
-
-    missing_count = missing_advanced.sum()
 
     print(
-        f"  Games missing advanced statistics: "
-        f"{missing_count}"
+        "  PASS: Final dataset is valid."
     )
 
-    if missing_count > 0:
 
-        missing_games = final_features.loc[
-            missing_advanced,
-            [
-                "gameId",
-                "homeTeam",
-                "awayTeam",
-                "homeClassification",
-                "awayClassification"
-            ]
-        ]
+# ============================================================
+# Main
+# ============================================================
+
+if __name__ == "__main__":
+
+    all_years_passed = True
+
+    for year in range(
+        START_YEAR,
+        END_YEAR + 1
+    ):
+
+        print("\n" + "=" * 70)
 
         print(
-            "\nGames missing advanced statistics:"
+            f"CREATING FINAL FEATURES: {year}"
         )
 
-        print(
-            missing_games.to_string(
+        print("=" * 70)
+
+        try:
+
+            # ------------------------------------------------
+            # Load datasets
+            # ------------------------------------------------
+
+            game_features, advanced_features = (
+                load_feature_data(year)
+            )
+
+            print("\nLoaded data:")
+
+            print(
+                f"  Game-level features: "
+                f"{game_features.shape}"
+            )
+
+            print(
+                f"  Advanced features: "
+                f"{advanced_features.shape}"
+            )
+
+            # ------------------------------------------------
+            # Validate unique IDs
+            # ------------------------------------------------
+
+            validate_unique_game_ids(
+                game_features,
+                "Game-level features",
+                "gameId"
+            )
+
+            validate_unique_game_ids(
+                advanced_features,
+                "Advanced features",
+                "id"
+            )
+
+            # ------------------------------------------------
+            # Validate expected CFBD relationship
+            # ------------------------------------------------
+
+            validate_game_id_match(
+                year,
+                game_features,
+                advanced_features
+            )
+
+            # ------------------------------------------------
+            # Validate teams
+            # ------------------------------------------------
+
+            validate_game_information(
+                game_features,
+                advanced_features
+            )
+
+            # ------------------------------------------------
+            # Create final dataset
+            # ------------------------------------------------
+
+            final_features = (
+                create_final_features(
+                    year,
+                    game_features,
+                    advanced_features
+                )
+            )
+
+            # ------------------------------------------------
+            # Validate final dataset
+            # ------------------------------------------------
+
+            validate_final_dataset(
+                final_features
+            )
+
+            # ------------------------------------------------
+            # Save
+            # ------------------------------------------------
+
+            output_path = (
+                OUTPUT_PATH.format(
+                    year=year
+                )
+            )
+
+            final_features.to_csv(
+                output_path,
                 index=False
             )
-        )
 
-        raise ValueError(
-            f"{missing_count} Option B games are "
-            f"missing advanced statistics for {year}."
-        )
+            print(
+                "\nSaved final features:"
+            )
 
-    # --------------------------------------------------------
-    # Success
-    # --------------------------------------------------------
+            print(
+                f"  {output_path}"
+            )
 
-    print("\nPASS:")
-    print(
-        "  All games involve at least one FBS team."
-    )
-    print(
-        "  All games have game-level features."
-    )
-    print(
-        "  All games have advanced statistics."
-    )
-    print(
-        "  No duplicate games were created."
-    )
+            print(
+                f"  Shape: "
+                f"{final_features.shape}"
+            )
 
+        except Exception as e:
 
-# ============================================================
-# SAVE
-# ============================================================
+            all_years_passed = False
 
-def save_final_features(df, year):
+            print(
+                "\n" + "!" * 70
+            )
 
-    FINAL_FEATURES_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+            print(
+                f"FAILED: {year}"
+            )
 
-    output_path = (
-        FINAL_FEATURES_DIR
-        / f"final_features_{year}.csv"
-    )
+            print(
+                f"ERROR: {e}"
+            )
 
-    df.to_csv(
-        output_path,
-        index=False
-    )
+            print(
+                "!" * 70
+            )
 
-    print("\nSaved:")
-    print(f"  {output_path}")
+    # ========================================================
+    # Final result
+    # ========================================================
 
+    print("\n" + "=" * 70)
+    print("FINAL RESULT")
+    print("=" * 70)
 
-# ============================================================
-# PROCESS SEASON
-# ============================================================
-
-def process_season(year):
-
-    try:
-
-        # ----------------------------------------------------
-        # Load
-        # ----------------------------------------------------
-
-        games, game_features, advanced_features = (
-            load_data(year)
-        )
-
-        # ----------------------------------------------------
-        # Validate inputs
-        # ----------------------------------------------------
-
-        validate_input_data(
-            games,
-            game_features,
-            advanced_features,
-            year
-        )
-
-        # ----------------------------------------------------
-        # Option B filter
-        # ----------------------------------------------------
-
-        option_b_games = create_option_b_games(
-            games
-        )
+    if all_years_passed:
 
         print(
-            f"\nOption B eligible games: "
-            f"{len(option_b_games)}"
-        )
-
-        # ----------------------------------------------------
-        # Merge game-level features
-        # ----------------------------------------------------
-
-        merged_game_features = merge_game_features(
-            option_b_games,
-            game_features,
-            year
-        )
-
-        # ----------------------------------------------------
-        # Merge advanced statistics
-        # ----------------------------------------------------
-
-        final_features = merge_advanced_features(
-            merged_game_features,
-            advanced_features,
-            year
-        )
-
-        # ----------------------------------------------------
-        # Validate final dataset
-        # ----------------------------------------------------
-
-        validate_final_merge(
-            option_b_games,
-            final_features,
-            advanced_features,
-            year
-        )
-
-        # ----------------------------------------------------
-        # Save
-        # ----------------------------------------------------
-
-        save_final_features(
-            final_features,
-            year
-        )
-
-        return True
-
-    except Exception as e:
-
-        print(f"\nERROR processing {year}:")
-        print(f"{type(e).__name__}: {e}")
-
-        return False
-
-
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-
-    years = range(2015, 2026)
-
-    results = {}
-
-    for year in years:
-
-        results[year] = process_season(year)
-
-    print(f"\n{'=' * 70}")
-    print("FINAL FEATURE CREATION")
-    print(f"{'=' * 70}")
-
-    for year, success in results.items():
-
-        status = "PASS" if success else "FAIL"
-
-        print(f"{year}: {status}")
-
-    if all(results.values()):
-
-        print(
-            "\n" + "=" * 70
-        )
-
-        print(
-            "SUCCESS: FINAL FEATURES CREATED "
-            "FOR ALL SEASONS"
-        )
-
-        print(
-            "=" * 70
+            "PASS: Final feature datasets "
+            "created successfully for all seasons."
         )
 
     else:
 
         print(
-            "\n" + "=" * 70
+            "FAIL: One or more seasons "
+            "could not be processed."
         )
-
-        print(
-            "FAIL: One or more seasons could "
-            "not be processed."
-        )
-
-        print(
-            "=" * 70
-        )
-
-
-if __name__ == "__main__":
-    main()
