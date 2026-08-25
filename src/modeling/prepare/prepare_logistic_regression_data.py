@@ -131,7 +131,8 @@ def identify_model_features(
     print("IDENTIFYING MODEL FEATURES")
     print("=" * 70)
 
-    # Use both the category and predictive_safe flag.
+    # Select features that are explicitly marked predictive-safe and belong
+    # to a pregame feature category.
     model_features = classification.loc[
         (
             classification["predictive_safe"].astype(bool)
@@ -147,8 +148,9 @@ def identify_model_features(
 
     print(f"Predictive-safe model features: {len(model_features)}")
 
+    # Summarize the selected features by their classification category.
     selected_classification = classification[
-        classification["column"].isna(model_features)
+        classification["column"].isin(model_features)
     ]
 
     category_counts = (
@@ -158,6 +160,7 @@ def identify_model_features(
     )
 
     print("\nFeatures by category:")
+
     for category, count in category_counts.items():
         print(f"  {category:<25} {count:>5}")
 
