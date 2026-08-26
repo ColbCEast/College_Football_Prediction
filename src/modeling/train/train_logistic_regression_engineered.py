@@ -1,22 +1,22 @@
 """
-Train V2 Engineered Logistic Regression Model
+train_logistic_regression_engineered.py
 
-V2 engineering strategy
-------------------------
-1. Explicitly select canonical pregame statistics.
-2. Create home-minus-away matchup differences.
-3. Use home Elo minus away Elo rather than separate Elo features.
-4. Include season-long and recent-form statistics where appropriate.
-5. Exclude bookkeeping / schedule-position features such as GamesBefore.
-6. Avoid semantically duplicated feature representations.
-7. Standardize using training data only.
-8. Preserve the existing temporal train / validation / test split.
+Engineered Logistic Regression V3
 
-Target
-------
-win_home
-    1 = home team wins
-    0 = away team wins
+Purpose
+-------
+Train a temporally valid logistic regression model using:
+    1. V2 matchup/difference features
+    2. Iterative VIF-based feature reduction
+    3. Missingness indicators for substantially missing features
+    4. Training-only median imputation
+
+V3 goals
+--------
+- Reduce multicollinearity that produced unstable/counterintuitive coefficients
+- Preserve conceptually important features
+- Allow missingness itself to carry predictive information
+- Maintain strict temporal separation between train/validation/test
 """
 
 from pathlib import Path
@@ -27,1270 +27,1412 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
-    brier_score_loss,
     classification_report,
     confusion_matrix,
+    roc_auc_score,
     log_loss,
+    brier_score_loss,
     precision_score,
     recall_score,
-    roc_auc_score,
 )
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
 warnings.filterwarnings("ignore")
 
 
-# ============================================================================
+# ======================================================================
 # PATHS
-# ============================================================================
+# ======================================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 DATA_DIR = PROJECT_ROOT / "data" / "processed" / "modeling"
+MODEL_DIR = PROJECT_ROOT / "models" / "logistic_regression"
 
 TRAIN_PATH = DATA_DIR / "logistic_regression_train.csv"
 VALIDATION_PATH = DATA_DIR / "logistic_regression_validation.csv"
 TEST_PATH = DATA_DIR / "logistic_regression_test.csv"
 
-MODEL_DIR = PROJECT_ROOT / "models" / "logistic_regression"
+MODEL_PATH = MODEL_DIR / "logistic_regression_engineered_v3.joblib"
+METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_v3_metrics.json"
 
-MODEL_PATH = (
-    MODEL_DIR /
-    "logistic_regression_engineered_v2.joblib"
+FEATURE_SELECTION_PATH = (
+    MODEL_DIR / "engineered_v3_selected_features.json"
 )
 
-FEATURE_PATH = (
-    MODEL_DIR /
-    "logistic_regression_engineered_v2_features.csv"
+VIF_PATH = (
+    MODEL_DIR / "engineered_v3_vif_history.csv"
 )
 
-METRICS_PATH = (
-    MODEL_DIR /
-    "logistic_regression_engineered_v2_metrics.json"
+MISSINGNESS_PATH = (
+    MODEL_DIR / "engineered_v3_missingness.csv"
 )
 
-
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
 
 TARGET = "win_home"
 
-RANDOM_STATE = 42
 
+# ======================================================================
+# V2 CANONICAL FEATURE DEFINITIONS
+# ======================================================================
 
-# ============================================================================
-# CANONICAL FEATURE SPECIFICATION
-# ============================================================================
+# These are the canonical statistics used to construct the V2 matchup
+# features. Each statistic must have a _home and _away version.
 #
-# Each entry represents one underlying football statistic.
-#
-# The script searches for the canonical home/away columns in priority order.
-#
-# We deliberately use only ONE representation of each statistic.
-#
-# We do NOT include:
-#   - GamesBefore
-#   - WinsBefore
-#   - raw cumulative counting statistics where an average exists
-#   - duplicate prefixed/non-prefixed representations
-#   - raw home/away Elo separately
-#
-# Instead, most statistics are represented as:
+# The resulting feature is:
 #
 #     home_value - away_value
 #
-# ============================================================================
-
-
-FEATURE_SPEC = {
-
-    # ------------------------------------------------------------------------
-    # ELO / TEAM STRENGTH
-    # ------------------------------------------------------------------------
-
-    "elo": {
-        "home": ["homePregameElo"],
-        "away": ["awayPregameElo"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # SCORING
-    # ------------------------------------------------------------------------
-
-    "pointsForAvgBefore": {
-        "home": ["pointsForAvgBefore_home"],
-        "away": ["pointsForAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "pointsForAvgLast3": {
-        "home": ["pointsForAvgLast3_home"],
-        "away": ["pointsForAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "pointsForAvgLast5": {
-        "home": ["pointsForAvgLast5_home"],
-        "away": ["pointsForAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "pointsAgainstAvgBefore": {
-        "home": ["pointsAgainstAvgBefore_home"],
-        "away": ["pointsAgainstAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "pointsAgainstAvgLast3": {
-        "home": ["pointsAgainstAvgLast3_home"],
-        "away": ["pointsAgainstAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "pointsAgainstAvgLast5": {
-        "home": ["pointsAgainstAvgLast5_home"],
-        "away": ["pointsAgainstAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "pointDifferentialAvgBefore": {
-        "home": ["pointDifferentialAvgBefore_home"],
-        "away": ["pointDifferentialAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "pointDifferentialAvgLast3": {
-        "home": ["pointDifferentialAvgLast3_home"],
-        "away": ["pointDifferentialAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "pointDifferentialAvgLast5": {
-        "home": ["pointDifferentialAvgLast5_home"],
-        "away": ["pointDifferentialAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # PASSING
-    # ------------------------------------------------------------------------
-
-    "completionPctBefore": {
-        "home": ["completionPctBefore_home"],
-        "away": ["completionPctBefore_away"],
-        "transformation": "difference",
-    },
-
-    "completionsAvgBefore": {
-        "home": ["completionsAvgBefore_home"],
-        "away": ["completionsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "netPassingYardsAvgBefore": {
-        "home": ["netPassingYardsAvgBefore_home"],
-        "away": ["netPassingYardsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "netPassingYardsAvgLast3": {
-        "home": ["netPassingYardsAvgLast3_home"],
-        "away": ["netPassingYardsAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "netPassingYardsAvgLast5": {
-        "home": ["netPassingYardsAvgLast5_home"],
-        "away": ["netPassingYardsAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "passAttemptsAvgBefore": {
-        "home": ["passAttemptsAvgBefore_home"],
-        "away": ["passAttemptsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "yardsPerPassAttemptBefore": {
-        "home": ["yardsPerPassAttemptBefore_home"],
-        "away": ["yardsPerPassAttemptBefore_away"],
-        "transformation": "difference",
-    },
-
-    "passingTDsAvgBefore": {
-        "home": ["passingTDsAvgBefore_home"],
-        "away": ["passingTDsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "interceptionsAvgBefore": {
-        "home": ["interceptionsAvgBefore_home"],
-        "away": ["interceptionsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "passesDeflectedAvgBefore": {
-        "home": ["passesDeflectedAvgBefore_home"],
-        "away": ["passesDeflectedAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "passesDeflectedAvgLast3": {
-        "home": ["passesDeflectedAvgLast3_home"],
-        "away": ["passesDeflectedAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "passesDeflectedAvgLast5": {
-        "home": ["passesDeflectedAvgLast5_home"],
-        "away": ["passesDeflectedAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # RUSHING
-    # ------------------------------------------------------------------------
-
-    "rushingYardsAvgBefore": {
-        "home": ["rushingYardsAvgBefore_home"],
-        "away": ["rushingYardsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "rushingYardsAvgLast3": {
-        "home": ["rushingYardsAvgLast3_home"],
-        "away": ["rushingYardsAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "rushingYardsAvgLast5": {
-        "home": ["rushingYardsAvgLast5_home"],
-        "away": ["rushingYardsAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "rushingAttemptsAvgBefore": {
-        "home": ["rushingAttemptsAvgBefore_home"],
-        "away": ["rushingAttemptsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "rushingTDsAvgBefore": {
-        "home": ["rushingTDsAvgBefore_home"],
-        "away": ["rushingTDsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "yardsPerRushAttemptBefore": {
-        "home": ["yardsPerRushAttemptBefore_home"],
-        "away": ["yardsPerRushAttemptBefore_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # TOTAL OFFENSE
-    # ------------------------------------------------------------------------
-
-    "totalYardsAvgBefore": {
-        "home": ["totalYardsAvgBefore_home"],
-        "away": ["totalYardsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "totalYardsAvgLast3": {
-        "home": ["totalYardsAvgLast3_home"],
-        "away": ["totalYardsAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "totalYardsAvgLast5": {
-        "home": ["totalYardsAvgLast5_home"],
-        "away": ["totalYardsAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "firstDownsAvgBefore": {
-        "home": ["firstDownsAvgBefore_home"],
-        "away": ["firstDownsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # DEFENSE
-    # ------------------------------------------------------------------------
-
-    "tacklesForLossAvgBefore": {
-        "home": ["tacklesForLossAvgBefore_home"],
-        "away": ["tacklesForLossAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "tacklesForLossAvgLast3": {
-        "home": ["tacklesForLossAvgLast3_home"],
-        "away": ["tacklesForLossAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "tacklesForLossAvgLast5": {
-        "home": ["tacklesForLossAvgLast5_home"],
-        "away": ["tacklesForLossAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "qbHurriesAvgBefore": {
-        "home": ["qbHurriesAvgBefore_home"],
-        "away": ["qbHurriesAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "qbHurriesAvgLast3": {
-        "home": ["qbHurriesAvgLast3_home"],
-        "away": ["qbHurriesAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "qbHurriesAvgLast5": {
-        "home": ["qbHurriesAvgLast5_home"],
-        "away": ["qbHurriesAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "sacksAvgBefore": {
-        "home": ["sacksAvgBefore_home"],
-        "away": ["sacksAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "sacksAvgLast3": {
-        "home": ["sacksAvgLast3_home"],
-        "away": ["sacksAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "sacksAvgLast5": {
-        "home": ["sacksAvgLast5_home"],
-        "away": ["sacksAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # TURNOVERS / BALL SECURITY
-    # ------------------------------------------------------------------------
-
-    "turnoversAvgBefore": {
-        "home": ["turnoversAvgBefore_home"],
-        "away": ["turnoversAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "turnoversAvgLast3": {
-        "home": ["turnoversAvgLast3_home"],
-        "away": ["turnoversAvgLast3_away"],
-        "transformation": "difference",
-    },
-
-    "turnoversAvgLast5": {
-        "home": ["turnoversAvgLast5_home"],
-        "away": ["turnoversAvgLast5_away"],
-        "transformation": "difference",
-    },
-
-    "fumblesLostAvgBefore": {
-        "home": ["fumblesLostAvgBefore_home"],
-        "away": ["fumblesLostAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # POSSESSION
-    # ------------------------------------------------------------------------
-
-    "possessionSecondsAvgBefore": {
-        "home": ["possessionSecondsAvgBefore_home"],
-        "away": ["possessionSecondsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # SITUATIONAL FOOTBALL
-    # ------------------------------------------------------------------------
-
-    "thirdDownPctBefore": {
-        "home": ["thirdDownPctBefore_home"],
-        "away": ["thirdDownPctBefore_away"],
-        "transformation": "difference",
-    },
-
-    "thirdDownAttemptsAvgBefore": {
-        "home": ["thirdDownAttemptsAvgBefore_home"],
-        "away": ["thirdDownAttemptsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "thirdDownConversionsAvgBefore": {
-        "home": ["thirdDownConversionsAvgBefore_home"],
-        "away": ["thirdDownConversionsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "fourthDownPctBefore": {
-        "home": ["fourthDownPctBefore_home"],
-        "away": ["fourthDownPctBefore_away"],
-        "transformation": "difference",
-    },
-
-    "fourthDownAttemptsAvgBefore": {
-        "home": ["fourthDownAttemptsAvgBefore_home"],
-        "away": ["fourthDownAttemptsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "fourthDownConversionsAvgBefore": {
-        "home": ["fourthDownConversionsAvgBefore_home"],
-        "away": ["fourthDownConversionsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # PENALTIES
-    # ------------------------------------------------------------------------
-
-    "penaltiesAvgBefore": {
-        "home": ["penaltiesAvgBefore_home"],
-        "away": ["penaltiesAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-    "penaltyYardsAvgBefore": {
-        "home": ["penaltyYardsAvgBefore_home"],
-        "away": ["penaltyYardsAvgBefore_away"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # ADVANCED OFFENSE
-    # ------------------------------------------------------------------------
-
-    "offenseExplosiveness": {
-        "home": ["home_pregame_offense_explosiveness"],
-        "away": ["away_pregame_offense_explosiveness"],
-        "transformation": "difference",
-    },
-
-    "offensePPA": {
-        "home": ["home_pregame_offense_ppa"],
-        "away": ["away_pregame_offense_ppa"],
-        "transformation": "difference",
-    },
-
-    "offenseSuccessRate": {
-        "home": ["home_pregame_offense_successRate"],
-        "away": ["away_pregame_offense_successRate"],
-        "transformation": "difference",
-    },
-
-
-    # ------------------------------------------------------------------------
-    # ADVANCED DEFENSE
-    # ------------------------------------------------------------------------
-
-    "defenseExplosiveness": {
-        "home": ["home_pregame_defense_explosiveness"],
-        "away": ["away_pregame_defense_explosiveness"],
-        "transformation": "difference",
-    },
-
-    "defensePPA": {
-        "home": ["home_pregame_defense_ppa"],
-        "away": ["away_pregame_defense_ppa"],
-        "transformation": "difference",
-    },
-
-    "defenseSuccessRate": {
-        "home": ["home_pregame_defense_successRate"],
-        "away": ["away_pregame_defense_successRate"],
-        "transformation": "difference",
-    },
+# This list intentionally mirrors the V2 feature engineering process.
+
+ADVANCED_METRIC_PAIRS = {
+    "offenseExplosiveness": (
+        "home_pregame_offense_explosiveness",
+        "away_pregame_offense_explosiveness",
+    ),
+    "offensePPA": (
+        "home_pregame_offense_ppa",
+        "away_pregame_offense_ppa",
+    ),
+    "offenseSuccessRate": (
+        "home_pregame_offense_successRate",
+        "away_pregame_offense_successRate",
+    ),
+    "defenseExplosiveness": (
+        "home_pregame_defense_explosiveness",
+        "away_pregame_defense_explosiveness",
+    ),
+    "defensePPA": (
+        "home_pregame_defense_ppa",
+        "away_pregame_defense_ppa",
+    ),
+    "defenseSuccessRate": (
+        "home_pregame_defense_successRate",
+        "away_pregame_defense_successRate",
+    ),
 }
 
 
-# ============================================================================
-# LOGGING
-# ============================================================================
+# Features that should not be eliminated merely because they have
+# multicollinearity with other measures of team strength.
+#
+# These are conceptual anchors rather than arbitrary statistical
+# features.
+PROTECTED_FEATURES = {
+    "matchup_elo",
+    "matchup_pointDifferentialAvgBefore",
+}
 
-def print_header(title):
-    print()
-    print("=" * 70)
+
+# Thresholds
+VIF_THRESHOLD = 5.0
+MISSINGNESS_THRESHOLD = 0.25
+
+
+# ======================================================================
+# UTILITY FUNCTIONS
+# ======================================================================
+
+def print_section(title):
+    print("\n" + "=" * 70)
     print(title)
     print("=" * 70)
 
 
-# ============================================================================
-# DATA LOADING
-# ============================================================================
+def load_data():
+    print_section("LOADING TEMPORAL SPLITS")
 
-def load_split(path, split_name):
-    """Load a temporal modeling split."""
+    print(f"Loading Training: {TRAIN_PATH}")
+    train = pd.read_csv(TRAIN_PATH)
+    print(f"  Shape: {train.shape}")
 
-    print(f"Loading {split_name}: {path}")
+    print(f"Loading Validation: {VALIDATION_PATH}")
+    validation = pd.read_csv(VALIDATION_PATH)
+    print(f"  Shape: {validation.shape}")
 
-    if not path.exists():
-        raise FileNotFoundError(
-            f"\nCould not find {split_name} file:\n"
-            f"  {path}\n\n"
-            f"Check the paths used by split_logistic_regression.py."
-        )
+    print(f"Loading Test: {TEST_PATH}")
+    test = pd.read_csv(TEST_PATH)
+    print(f"  Shape: {test.shape}")
 
-    df = pd.read_csv(path)
-
-    print(f"  Shape: {df.shape}")
-
-    return df
+    return train, validation, test
 
 
-# ============================================================================
-# COLUMN RESOLUTION
-# ============================================================================
+def validate_targets(train, validation, test):
+    print_section("VALIDATING TARGETS")
 
-def resolve_column(df, candidates):
-    """
-    Find the first available candidate column.
-
-    Candidates are ordered by preference.
-    """
-
-    for column in candidates:
-        if column in df.columns:
-            return column
-
-    return None
-
-
-def validate_feature_spec(df):
-    """
-    Validate that every requested canonical feature can be constructed.
-    """
-
-    missing = []
-
-    for feature_name, specification in FEATURE_SPEC.items():
-
-        home_column = resolve_column(
-            df,
-            specification["home"],
-        )
-
-        away_column = resolve_column(
-            df,
-            specification["away"],
-        )
-
-        if home_column is None:
-            missing.append(
-                f"{feature_name}: HOME missing "
-                f"{specification['home']}"
+    for name, df in [
+        ("Training", train),
+        ("Validation", validation),
+        ("Test", test),
+    ]:
+        if TARGET not in df.columns:
+            raise ValueError(
+                f"{TARGET} missing from {name} dataset."
             )
 
-        if away_column is None:
-            missing.append(
-                f"{feature_name}: AWAY missing "
-                f"{specification['away']}"
+        if df[TARGET].isna().any():
+            raise ValueError(
+                f"{TARGET} contains missing values in {name}."
             )
 
-    if missing:
-        print()
-        print("MISSING FEATURE COLUMNS")
-        print("-" * 70)
+        unique_values = set(df[TARGET].unique())
 
-        for item in missing:
-            print(f"  {item}")
+        if not unique_values.issubset({0, 1}):
+            raise ValueError(
+                f"{name} target contains unexpected values: "
+                f"{unique_values}"
+            )
 
+        print(f"{name}: {df[TARGET].value_counts().to_dict()}")
+
+
+# ======================================================================
+# V2 FEATURE ENGINEERING
+# ======================================================================
+
+def create_matchup_features(df):
+    """
+    Create V2/V3 matchup features.
+
+    For each selected statistic:
+        matchup_feature = home_value - away_value
+
+    Advanced pregame metrics use their actual column names because
+    they do not follow the standard {stat}_home / {stat}_away naming
+    convention.
+    """
+
+    print("\n" + "=" * 70)
+    print("CREATING ENGINEERED MATCHUP FEATURES")
+    print("=" * 70)
+
+    # ------------------------------------------------------------------
+    # STANDARD STATISTICS
+    # ------------------------------------------------------------------
+
+    canonical_stats = [
+        # Passing
+        "completionsAvgBefore",
+        "netPassingYardsAvgBefore",
+        "netPassingYardsAvgLast3",
+        "netPassingYardsAvgLast5",
+        "passAttemptsAvgBefore",
+        "passingTDsAvgBefore",
+        "yardsPerPassAttemptBefore",
+
+        # Rushing
+        "rushingYardsAvgBefore",
+        "rushingYardsAvgLast3",
+        "rushingYardsAvgLast5",
+        "rushingAttemptsAvgBefore",
+        "rushingTDsAvgBefore",
+        "yardsPerRushAttemptBefore",
+
+        # Total offense
+        "totalYardsAvgBefore",
+        "totalYardsAvgLast3",
+        "totalYardsAvgLast5",
+
+        # Scoring / results
+        "pointsForAvgBefore",
+        "pointsForAvgLast3",
+        "pointsForAvgLast5",
+        "pointsAgainstAvgBefore",
+        "pointsAgainstAvgLast3",
+        "pointsAgainstAvgLast5",
+        "pointDifferentialAvgBefore",
+        "pointDifferentialAvgLast3",
+        "pointDifferentialAvgLast5",
+        "winPctBefore",
+
+        # Turnovers
+        "turnoversAvgBefore",
+        "turnoversAvgLast3",
+        "turnoversAvgLast5",
+        "fumblesLostAvgBefore",
+        "interceptionsAvgBefore",
+
+        # Defense
+        "sacksAvgBefore",
+        "sacksAvgLast3",
+        "sacksAvgLast5",
+        "qbHurriesAvgBefore",
+        "qbHurriesAvgLast3",
+        "qbHurriesAvgLast5",
+        "tacklesForLossAvgBefore",
+        "tacklesForLossAvgLast3",
+        "tacklesForLossAvgLast5",
+        "passesDeflectedAvgBefore",
+        "passesDeflectedAvgLast3",
+        "passesDeflectedAvgLast5",
+
+        # Situational
+        "thirdDownAttemptsAvgBefore",
+        "thirdDownConversionsAvgBefore",
+        "thirdDownPctBefore",
+        "fourthDownAttemptsAvgBefore",
+        "fourthDownConversionsAvgBefore",
+        "fourthDownPctBefore",
+
+        # Other
+        "firstDownsAvgBefore",
+        "possessionSecondsAvgBefore",
+        "penaltiesAvgBefore",
+        "penaltyYardsAvgBefore",
+
+        # Additional passing/rushing volume
+        "completionPctBefore",
+        "rushingYardsAvgBefore",
+        "passAttemptsAvgBefore",
+    ]
+
+    # Remove accidental duplicates while preserving order
+    canonical_stats = list(dict.fromkeys(canonical_stats))
+
+    # ------------------------------------------------------------------
+    # ACTUAL COLUMN NAMES FOR ADVANCED PREGAME METRICS
+    #
+    # These DO NOT follow the normal {stat}_home / {stat}_away schema.
+    # ------------------------------------------------------------------
+
+    advanced_metric_pairs = {
+        "offenseExplosiveness": (
+            "home_pregame_offense_explosiveness",
+            "away_pregame_offense_explosiveness",
+        ),
+        "offensePPA": (
+            "home_pregame_offense_ppa",
+            "away_pregame_offense_ppa",
+        ),
+        "offenseSuccessRate": (
+            "home_pregame_offense_successRate",
+            "away_pregame_offense_successRate",
+        ),
+        "defenseExplosiveness": (
+            "home_pregame_defense_explosiveness",
+            "away_pregame_defense_explosiveness",
+        ),
+        "defensePPA": (
+            "home_pregame_defense_ppa",
+            "away_pregame_defense_ppa",
+        ),
+        "defenseSuccessRate": (
+            "home_pregame_defense_successRate",
+            "away_pregame_defense_successRate",
+        ),
+    }
+
+    matchup_features = {}
+
+    # ------------------------------------------------------------------
+    # CREATE STANDARD MATCHUP FEATURES
+    # ------------------------------------------------------------------
+
+    print(f"\nCanonical statistics selected: {len(canonical_stats)}")
+
+    missing_standard = []
+
+    for stat in canonical_stats:
+
+        home_col = f"{stat}_home"
+        away_col = f"{stat}_away"
+
+        if home_col not in df.columns or away_col not in df.columns:
+            missing_standard.append(
+                (stat, home_col, away_col)
+            )
+            continue
+
+        matchup_features[f"matchup_{stat}"] = (
+            df[home_col] - df[away_col]
+        )
+
+    # ------------------------------------------------------------------
+    # CREATE ADVANCED-METRIC MATCHUPS
+    # ------------------------------------------------------------------
+
+    missing_advanced = []
+
+    for feature_name, (home_col, away_col) in advanced_metric_pairs.items():
+
+        if home_col not in df.columns or away_col not in df.columns:
+            missing_advanced.append(
+                (feature_name, home_col, away_col)
+            )
+            continue
+
+        matchup_features[f"matchup_{feature_name}"] = (
+            df[home_col] - df[away_col]
+        )
+
+    # ------------------------------------------------------------------
+    # ADD ELO
+    #
+    # ELO is deliberately represented as a matchup difference rather
+    # than separate home/away absolute features.
+    # ------------------------------------------------------------------
+
+    if (
+        "homePregameElo" in df.columns
+        and "awayPregameElo" in df.columns
+    ):
+        matchup_features["matchup_elo"] = (
+            df["homePregameElo"] - df["awayPregameElo"]
+        )
+    else:
         raise ValueError(
-            f"\n{len(missing)} required feature columns could not be resolved."
+            "Missing required ELO columns: "
+            "homePregameElo and/or awayPregameElo"
         )
 
+    # ------------------------------------------------------------------
+    # VALIDATION
+    # ------------------------------------------------------------------
 
-# ============================================================================
-# FEATURE ENGINEERING
-# ============================================================================
+    if missing_standard:
+        print("\nWARNING: Missing standard feature pairs:")
 
-def engineer_features(df, split_name):
-    """
-    Construct the explicit V2 matchup feature matrix.
-    """
+        for stat, home_col, away_col in missing_standard:
+            print(f"  {stat}: {home_col}, {away_col}")
 
-    print_header(
-        f"ENGINEERING V2 FEATURES: {split_name.upper()}"
+    if missing_advanced:
+        print("\nWARNING: Missing advanced feature pairs:")
+
+        for feature_name, home_col, away_col in missing_advanced:
+            print(
+                f"  {feature_name}: "
+                f"{home_col}, {away_col}"
+            )
+
+    # The advanced metrics are expected to exist in this dataset.
+    if missing_advanced:
+        raise ValueError(
+            "Required advanced pregame feature pairs are missing."
+        )
+
+    result = pd.DataFrame(
+        matchup_features,
+        index=df.index
     )
 
-    validate_feature_spec(df)
+    print(f"\nEngineered matchup features: {result.shape[1]}")
 
-    engineered = pd.DataFrame(index=df.index)
+    return result
 
-    metadata = []
 
-    for feature_name, specification in FEATURE_SPEC.items():
+# ======================================================================
+# MISSINGNESS ANALYSIS
+# ======================================================================
 
-        home_column = resolve_column(
-            df,
-            specification["home"],
-        )
+def analyze_missingness(X_train, y_train):
+    """
+    Analyze missingness using training data only.
 
-        away_column = resolve_column(
-            df,
-            specification["away"],
-        )
+    Returns a DataFrame containing:
+        - missing count
+        - missing percentage
+        - missing rate when home wins
+        - missing rate when home loses
+        - difference between the two
+    """
 
-        home_values = pd.to_numeric(
-            df[home_column],
-            errors="coerce",
-        )
+    rows = []
 
-        away_values = pd.to_numeric(
-            df[away_column],
-            errors="coerce",
-        )
+    for column in X_train.columns:
 
-        if specification["transformation"] == "difference":
+        missing = X_train[column].isna()
 
-            engineered_name = (
-                f"matchup_{feature_name}"
-            )
+        total_missing = int(missing.sum())
+        missing_pct = missing.mean()
 
-            engineered[engineered_name] = (
-                home_values - away_values
-            )
+        if missing.any():
 
-            metadata.append(
-                {
-                    "feature": engineered_name,
-                    "home_source": home_column,
-                    "away_source": away_column,
-                    "transformation": "home_minus_away",
-                }
-            )
+            home_win_missing_rate = missing[
+                y_train.values == 1
+            ].mean()
+
+            away_win_missing_rate = missing[
+                y_train.values == 0
+            ].mean()
 
         else:
-            raise ValueError(
-                f"Unknown transformation for {feature_name}: "
-                f"{specification['transformation']}"
+            home_win_missing_rate = 0.0
+            away_win_missing_rate = 0.0
+
+        rows.append(
+            {
+                "feature": column,
+                "missing_count": total_missing,
+                "missing_pct": missing_pct,
+                "missing_rate_home_win": home_win_missing_rate,
+                "missing_rate_home_loss": away_win_missing_rate,
+                "missing_rate_difference": (
+                    home_win_missing_rate
+                    - away_win_missing_rate
+                ),
+            }
+        )
+
+    result = pd.DataFrame(rows)
+
+    result = result.sort_values(
+        "missing_pct",
+        ascending=False
+    )
+
+    return result
+
+
+# ======================================================================
+# VIF CALCULATION
+# ======================================================================
+
+def calculate_vif(X):
+    """
+    Calculate VIF values.
+
+    Missing values must already be imputed before this function
+    is called.
+
+    Standardization is used so that the regression underlying VIF
+    is numerically stable.
+    """
+
+    if X.shape[1] == 1:
+        return pd.DataFrame(
+            {
+                "feature": X.columns,
+                "vif": [1.0],
+            }
+        )
+
+    scaler = StandardScaler()
+
+    X_scaled = scaler.fit_transform(X)
+
+    vif_rows = []
+
+    for i, column in enumerate(X.columns):
+
+        try:
+            vif = variance_inflation_factor(
+                X_scaled,
+                i
+            )
+        except Exception:
+            vif = np.inf
+
+        if not np.isfinite(vif):
+            vif = np.inf
+
+        vif_rows.append(
+            {
+                "feature": column,
+                "vif": vif,
+            }
+        )
+
+    return (
+        pd.DataFrame(vif_rows)
+        .sort_values("vif", ascending=False)
+        .reset_index(drop=True)
+    )
+
+
+# ======================================================================
+# ITERATIVE VIF REDUCTION
+# ======================================================================
+
+def iterative_vif_selection(
+    X_train,
+    protected_features,
+    threshold=5.0,
+):
+    """
+    Iteratively remove the highest-VIF feature until all
+    unprotected features have VIF < threshold.
+
+    VIF is calculated using training data only.
+
+    Protected features remain regardless of their VIF.
+    """
+
+    print_section("ITERATIVE VIF FEATURE REDUCTION")
+
+    print(f"Initial features: {X_train.shape[1]}")
+    print(f"VIF threshold   : {threshold}")
+    print(
+        "Protected features:"
+    )
+
+    for feature in protected_features:
+        print(f"  {feature}")
+
+    # ------------------------------------------------------------------
+    # Impute temporarily for VIF calculation.
+    #
+    # IMPORTANT:
+    # This imputation is only used for feature selection.
+    # The actual modeling imputation is performed later.
+    # ------------------------------------------------------------------
+
+    X_work = X_train.copy()
+
+    medians = X_work.median(numeric_only=True)
+
+    X_work = X_work.fillna(medians)
+
+    remaining = list(X_work.columns)
+
+    history = []
+
+    iteration = 0
+
+    while len(remaining) > 1:
+
+        iteration += 1
+
+        X_current = X_work[remaining]
+
+        vif_df = calculate_vif(X_current)
+
+        max_vif_row = vif_df.iloc[0]
+
+        max_feature = max_vif_row["feature"]
+        max_vif = max_vif_row["vif"]
+
+        # --------------------------------------------------------------
+        # Find highest-VIF removable feature.
+        # --------------------------------------------------------------
+
+        removable = vif_df[
+            ~vif_df["feature"].isin(
+                protected_features
+            )
+        ]
+
+        if removable.empty:
+            print(
+                "\nNo removable features remain."
+            )
+            break
+
+        candidate = removable.iloc[0]
+
+        candidate_feature = candidate["feature"]
+        candidate_vif = candidate["vif"]
+
+        # --------------------------------------------------------------
+        # Stop if highest removable VIF is below threshold.
+        # --------------------------------------------------------------
+
+        if candidate_vif < threshold:
+            print(
+                f"\nStopping VIF reduction."
+            )
+            print(
+                f"Highest remaining removable VIF: "
+                f"{candidate_vif:.4f}"
+            )
+            break
+
+        # --------------------------------------------------------------
+        # Remove feature.
+        # --------------------------------------------------------------
+
+        remaining.remove(candidate_feature)
+
+        history.append(
+            {
+                "iteration": iteration,
+                "removed_feature": candidate_feature,
+                "removed_vif": candidate_vif,
+                "max_vif_before_removal": max_vif,
+                "features_remaining": len(remaining),
+            }
+        )
+
+        print(
+            f"{iteration:>3}. Removing "
+            f"{candidate_feature:<50} "
+            f"VIF = {candidate_vif:,.2f}"
+        )
+
+    # ------------------------------------------------------------------
+    # Final VIF
+    # ------------------------------------------------------------------
+
+    final_vif = calculate_vif(
+        X_work[remaining]
+    )
+
+    print("\nVIF REDUCTION COMPLETE")
+    print("-" * 70)
+    print(
+        f"Starting features : {len(X_work.columns)}"
+    )
+    print(
+        f"Final features    : {len(remaining)}"
+    )
+
+    max_final_vif = final_vif["vif"].max()
+
+    print(
+        f"Maximum final VIF : {max_final_vif:.4f}"
+    )
+
+    protected_remaining = [
+        f for f in protected_features
+        if f in remaining
+    ]
+
+    print(
+        f"Protected retained: "
+        f"{len(protected_remaining)}"
+    )
+
+    return (
+        remaining,
+        pd.DataFrame(history),
+        final_vif,
+    )
+
+
+# ======================================================================
+# ADD MISSINGNESS INDICATORS
+# ======================================================================
+
+def add_missing_indicators(
+    X_train,
+    X_validation,
+    X_test,
+    missingness_threshold=0.25,
+):
+    """
+    Add missingness indicators for features whose TRAINING
+    missingness exceeds the specified threshold.
+
+    The threshold is based exclusively on training data.
+    """
+
+    print_section("ADDING MISSINGNESS INDICATORS")
+
+    missingness = analyze_missingness(
+        X_train,
+        pd.Series(
+            np.zeros(len(X_train)),
+            index=X_train.index
+        ),
+    )
+
+    selected = missingness[
+        missingness["missing_pct"]
+        > missingness_threshold
+    ]["feature"].tolist()
+
+    print(
+        f"Missingness threshold: "
+        f">{missingness_threshold:.0%}"
+    )
+
+    print(
+        f"Features requiring indicators: "
+        f"{len(selected)}"
+    )
+
+    if selected:
+        print("\nSelected features:")
+        for feature in selected:
+            pct = missingness.loc[
+                missingness["feature"] == feature,
+                "missing_pct"
+            ].iloc[0]
+
+            print(
+                f"  {feature:<50} "
+                f"{pct:.2%}"
             )
 
-    print(f"Canonical statistics selected: {len(FEATURE_SPEC)}")
-    print(f"Engineered matchup features: {engineered.shape[1]}")
+    for feature in selected:
 
-    return engineered, metadata
+        indicator = f"{feature}_missing"
 
-
-# ============================================================================
-# TARGET VALIDATION
-# ============================================================================
-
-def validate_target(df, split_name):
-    """Validate target column."""
-
-    if TARGET not in df.columns:
-        raise ValueError(
-            f"{TARGET} not found in {split_name} dataset."
+        X_train[indicator] = (
+            X_train[feature]
+            .isna()
+            .astype(int)
         )
 
-    values = df[TARGET].dropna().unique()
-
-    if not set(values).issubset({0, 1}):
-        raise ValueError(
-            f"{split_name} target contains values other than 0/1: "
-            f"{values}"
+        X_validation[indicator] = (
+            X_validation[feature]
+            .isna()
+            .astype(int)
         )
 
-    print(
-        f"{split_name} target distribution:"
-    )
+        X_test[indicator] = (
+            X_test[feature]
+            .isna()
+            .astype(int)
+        )
 
-    print(
-        df[TARGET]
-        .value_counts()
-        .sort_index()
-        .to_string()
+    return (
+        X_train,
+        X_validation,
+        X_test,
+        selected,
+        missingness,
     )
 
 
-# ============================================================================
-# FEATURE VALIDATION
-# ============================================================================
+# ======================================================================
+# IMPUTATION
+# ======================================================================
 
-def validate_feature_alignment(
+def impute_using_training_medians(
     X_train,
     X_validation,
     X_test,
 ):
-    """Ensure temporal splits have identical feature columns."""
+    """
+    Median-impute continuous features.
 
-    train_columns = list(X_train.columns)
-    validation_columns = list(X_validation.columns)
-    test_columns = list(X_test.columns)
+    Medians are learned from TRAINING ONLY.
+    """
 
-    if train_columns != validation_columns:
-        raise ValueError(
-            "Training and validation engineered features do not align."
-        )
+    print_section("TRAINING-ONLY MEDIAN IMPUTATION")
 
-    if train_columns != test_columns:
-        raise ValueError(
-            "Training and test engineered features do not align."
-        )
+    medians = X_train.median()
+
+    missing_before = (
+        X_train.isna().sum().sum(),
+        X_validation.isna().sum().sum(),
+        X_test.isna().sum().sum(),
+    )
+
+    X_train = X_train.fillna(medians)
+    X_validation = X_validation.fillna(medians)
+    X_test = X_test.fillna(medians)
+
+    missing_after = (
+        X_train.isna().sum().sum(),
+        X_validation.isna().sum().sum(),
+        X_test.isna().sum().sum(),
+    )
 
     print(
-        f"Feature alignment verified: "
-        f"{len(train_columns)} features"
+        f"Missing values before: "
+        f"Train={missing_before[0]}, "
+        f"Validation={missing_before[1]}, "
+        f"Test={missing_before[2]}"
     )
 
-
-# ============================================================================
-# MODEL
-# ============================================================================
-
-def create_model():
-    """
-    Create logistic regression pipeline.
-
-    Imputation and scaling are fitted only on training data.
-    """
-
-    return Pipeline(
-        steps=[
-            (
-                "imputer",
-                SimpleImputer(
-                    strategy="median"
-                ),
-            ),
-            (
-                "scaler",
-                StandardScaler(),
-            ),
-            (
-                "model",
-                LogisticRegression(
-                    max_iter=2000,
-                    random_state=RANDOM_STATE,
-                ),
-            ),
-        ]
+    print(
+        f"Missing values after : "
+        f"Train={missing_after[0]}, "
+        f"Validation={missing_after[1]}, "
+        f"Test={missing_after[2]}"
     )
 
+    if any(value != 0 for value in missing_after):
+        raise ValueError(
+            "Missing values remain after imputation."
+        )
 
-# ============================================================================
-# EVALUATION
-# ============================================================================
+    return X_train, X_validation, X_test, medians
 
-def evaluate_model(
-    model,
-    X,
-    y,
-    split_name,
-):
-    """Evaluate model performance."""
 
+# ======================================================================
+# MODEL EVALUATION
+# ======================================================================
+
+def evaluate_model(model, X, y, name):
+    """
+    Generate comprehensive classification and probability metrics.
+    """
+
+    print_section(f"{name.upper()} PERFORMANCE")
+
+    predictions = model.predict(X)
     probabilities = model.predict_proba(X)[:, 1]
-
-    predictions = (
-        probabilities >= 0.5
-    ).astype(int)
 
     metrics = {
         "accuracy": accuracy_score(
-            y,
-            predictions,
+            y, predictions
         ),
-
         "balanced_accuracy": balanced_accuracy_score(
-            y,
-            predictions,
+            y, predictions
         ),
-
         "roc_auc": roc_auc_score(
-            y,
-            probabilities,
+            y, probabilities
         ),
-
         "log_loss": log_loss(
-            y,
-            probabilities,
+            y, probabilities
         ),
-
         "brier_score": brier_score_loss(
-            y,
-            probabilities,
+            y, probabilities
         ),
-
         "precision": precision_score(
-            y,
-            predictions,
-            zero_division=0,
+            y, predictions
         ),
-
         "recall": recall_score(
-            y,
-            predictions,
-            zero_division=0,
+            y, predictions
         ),
     }
 
-    print_header(
-        f"{split_name.upper()} PERFORMANCE"
-    )
-
     for metric, value in metrics.items():
         print(
-            f"{metric:20s}: {value:.4f}"
+            f"{metric:<20}: {value:.4f}"
         )
 
-    print()
-    print("Confusion Matrix:")
-
+    print("\nConfusion Matrix:")
     print(
         confusion_matrix(
             y,
-            predictions,
+            predictions
         )
     )
 
-    print()
-    print("Classification Report:")
-
+    print("\nClassification Report:")
     print(
         classification_report(
             y,
-            predictions,
-            digits=4,
-            zero_division=0,
+            predictions
         )
     )
 
     return metrics
 
 
-# ============================================================================
+# ======================================================================
 # COEFFICIENT ANALYSIS
-# ============================================================================
+# ======================================================================
 
-def save_feature_coefficients(
-    model,
-    feature_names,
-    metadata,
-):
+def get_coefficients(model, feature_names):
     """
-    Save coefficients with source feature information.
+    Return coefficient and odds-ratio table.
     """
 
-    logistic_model = (
-        model.named_steps["model"]
-    )
+    coefficients = model.coef_[0]
 
-    coefficients = (
-        logistic_model.coef_[0]
-    )
-
-    coefficient_df = pd.DataFrame(
+    result = pd.DataFrame(
         {
             "feature": feature_names,
             "coefficient": coefficients,
-            "absolute_coefficient": np.abs(
-                coefficients
-            ),
-            "odds_ratio": np.exp(
-                coefficients
-            ),
+            "odds_ratio": np.exp(coefficients),
         }
     )
 
-    metadata_df = pd.DataFrame(
-        metadata
+    result["abs_coefficient"] = (
+        result["coefficient"].abs()
     )
 
-    coefficient_df = coefficient_df.merge(
-        metadata_df,
-        on="feature",
-        how="left",
+    result = result.sort_values(
+        "abs_coefficient",
+        ascending=False
     )
 
-    coefficient_df = coefficient_df.sort_values(
-        "absolute_coefficient",
-        ascending=False,
-    )
-
-    FEATURE_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    coefficient_df.to_csv(
-        FEATURE_PATH,
-        index=False,
-    )
-
-    print()
-    print("TOP 20 ENGINEERED FEATURES")
-    print("-" * 70)
-
-    print(
-        coefficient_df[
-            [
-                "feature",
-                "coefficient",
-                "odds_ratio",
-                "home_source",
-                "away_source",
-            ]
-        ]
-        .head(20)
-        .to_string(index=False)
-    )
-
-    return coefficient_df
+    return result
 
 
-# ============================================================================
+# ======================================================================
 # MAIN
-# ============================================================================
+# ======================================================================
 
 def main():
 
-    print_header(
-        "TRAINING ENGINEERED LOGISTIC REGRESSION V2"
+    print("\n" + "=" * 70)
+    print("TRAINING ENGINEERED LOGISTIC REGRESSION V3")
+    print("=" * 70)
+
+    # ------------------------------------------------------------------
+    # Load data
+    # ------------------------------------------------------------------
+
+    train, validation, test = load_data()
+
+    # ------------------------------------------------------------------
+    # Validate target
+    # ------------------------------------------------------------------
+
+    validate_targets(
+        train,
+        validation,
+        test
     )
 
-    # ----------------------------------------------------------------------
-    # LOAD DATA
-    # ----------------------------------------------------------------------
+    y_train = train[TARGET].copy()
+    y_validation = validation[TARGET].copy()
+    y_test = test[TARGET].copy()
 
-    print_header(
-        "LOADING TEMPORAL SPLITS"
+    # ------------------------------------------------------------------
+    # Create V2 engineered features
+    # ------------------------------------------------------------------
+
+    print_section("CREATING V2 ENGINEERED FEATURES")
+
+    X_train = create_matchup_features(train)
+    X_validation = create_matchup_features(validation)
+    X_test = create_matchup_features(test)
+
+    print(
+        f"Training features   : {X_train.shape}"
+    )
+    print(
+        f"Validation features : {X_validation.shape}"
+    )
+    print(
+        f"Test features       : {X_test.shape}"
     )
 
-    train_df = load_split(
-        TRAIN_PATH,
-        "Training",
+    if list(X_train.columns) != list(X_validation.columns):
+        raise ValueError(
+            "Training and validation feature alignment failed."
+        )
+
+    if list(X_train.columns) != list(X_test.columns):
+        raise ValueError(
+            "Training and test feature alignment failed."
+        )
+
+    print("Feature alignment verified.")
+
+    # ------------------------------------------------------------------
+    # Analyze missingness BEFORE VIF selection
+    # ------------------------------------------------------------------
+
+    print_section("INITIAL MISSINGNESS ANALYSIS")
+
+    missingness = analyze_missingness(
+        X_train,
+        y_train
     )
 
-    validation_df = load_split(
-        VALIDATION_PATH,
-        "Validation",
+    high_missing = missingness[
+        missingness["missing_pct"]
+        >= MISSINGNESS_THRESHOLD
+    ]
+
+    print(
+        f"Features >= {MISSINGNESS_THRESHOLD:.0%} "
+        f"missing: {len(high_missing)}"
     )
 
-    test_df = load_split(
-        TEST_PATH,
-        "Test",
+    if len(high_missing) > 0:
+
+        print(
+            "\nTop high-missingness features:"
+        )
+
+        print(
+            high_missing[
+                [
+                    "feature",
+                    "missing_pct",
+                    "missing_rate_home_win",
+                    "missing_rate_home_loss",
+                    "missing_rate_difference",
+                ]
+            ].to_string(
+                index=False
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # VIF selection
+    # ------------------------------------------------------------------
+
+    (
+        selected_features,
+        vif_history,
+        final_vif,
+    ) = iterative_vif_selection(
+        X_train,
+        PROTECTED_FEATURES,
+        threshold=VIF_THRESHOLD,
     )
 
-    # ----------------------------------------------------------------------
-    # VALIDATE TARGET
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Restrict datasets to selected features
+    # ------------------------------------------------------------------
 
-    print_header(
-        "VALIDATING TARGETS"
+    X_train = X_train[selected_features].copy()
+    X_validation = X_validation[selected_features].copy()
+    X_test = X_test[selected_features].copy()
+
+    # ------------------------------------------------------------------
+    # Add missing indicators
+    # ------------------------------------------------------------------
+
+    (
+        X_train,
+        X_validation,
+        X_test,
+        missing_indicator_features,
+        missingness,
+    ) = add_missing_indicators(
+        X_train,
+        X_validation,
+        X_test,
+        missingness_threshold=MISSINGNESS_THRESHOLD,
     )
 
-    validate_target(
-        train_df,
-        "Training",
-    )
+    # ------------------------------------------------------------------
+    # Impute
+    # ------------------------------------------------------------------
 
-    validate_target(
-        validation_df,
-        "Validation",
-    )
-
-    validate_target(
-        test_df,
-        "Test",
-    )
-
-    y_train = train_df[TARGET]
-    y_validation = validation_df[TARGET]
-    y_test = test_df[TARGET]
-
-    # ----------------------------------------------------------------------
-    # ENGINEER FEATURES
-    # ----------------------------------------------------------------------
-
-    X_train, metadata = engineer_features(
-        train_df,
-        "training",
-    )
-
-    X_validation, validation_metadata = engineer_features(
-        validation_df,
-        "validation",
-    )
-
-    X_test, test_metadata = engineer_features(
-        test_df,
-        "test",
-    )
-
-    # ----------------------------------------------------------------------
-    # VALIDATE FEATURE ALIGNMENT
-    # ----------------------------------------------------------------------
-
-    print_header(
-        "VALIDATING ENGINEERED FEATURES"
-    )
-
-    validate_feature_alignment(
+    (
+        X_train,
+        X_validation,
+        X_test,
+        training_medians,
+    ) = impute_using_training_medians(
         X_train,
         X_validation,
         X_test,
     )
 
-    # ----------------------------------------------------------------------
-    # CHECK MISSINGNESS
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Final feature alignment
+    # ------------------------------------------------------------------
 
-    print_header(
-        "CHECKING ENGINEERED FEATURE MISSINGNESS"
-    )
+    print_section("FINAL FEATURE VALIDATION")
 
-    missing_summary = (
-        X_train.isna()
-        .sum()
-        .sort_values(
-            ascending=False
-        )
-    )
-
-    missing_features = (
-        missing_summary[
-            missing_summary > 0
-        ]
-    )
-
-    if len(missing_features) == 0:
-
-        print(
-            "No missing values in engineered "
-            "training features."
+    if list(X_train.columns) != list(X_validation.columns):
+        raise ValueError(
+            "Final training/validation feature alignment failed."
         )
 
-    else:
-
-        print(
-            f"Features containing missing values: "
-            f"{len(missing_features)}"
+    if list(X_train.columns) != list(X_test.columns):
+        raise ValueError(
+            "Final training/test feature alignment failed."
         )
 
-        print(
-            missing_features.to_string()
-        )
-
-    # ----------------------------------------------------------------------
-    # TRAIN MODEL
-    # ----------------------------------------------------------------------
-
-    print_header(
-        "TRAINING LOGISTIC REGRESSION V2"
-    )
-
-    model = create_model()
-
-    model.fit(
-        X_train,
-        y_train,
+    print(
+        f"Final feature count: "
+        f"{X_train.shape[1]}"
     )
 
     print(
-        "Model training complete."
+        f"Core matchup features: "
+        f"{len(selected_features)}"
     )
 
-    # ----------------------------------------------------------------------
-    # EVALUATE
-    # ----------------------------------------------------------------------
+    print(
+        f"Missing indicators: "
+        f"{len(missing_indicator_features)}"
+    )
+
+    # ------------------------------------------------------------------
+    # Train model
+    # ------------------------------------------------------------------
+
+    print_section("TRAINING LOGISTIC REGRESSION V3")
+
+    model = LogisticRegression(
+        max_iter=5000,
+        solver="lbfgs",
+        random_state=42,
+    )
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+    print("Model training complete.")
+
+    # ------------------------------------------------------------------
+    # Evaluate
+    # ------------------------------------------------------------------
 
     train_metrics = evaluate_model(
         model,
         X_train,
         y_train,
-        "Training",
+        "Training"
     )
 
     validation_metrics = evaluate_model(
         model,
         X_validation,
         y_validation,
-        "Validation",
+        "Validation"
     )
 
     test_metrics = evaluate_model(
         model,
         X_test,
         y_test,
-        "Test",
+        "Test"
     )
 
-    # ----------------------------------------------------------------------
-    # COEFFICIENT ANALYSIS
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Coefficients
+    # ------------------------------------------------------------------
 
-    coefficient_df = save_feature_coefficients(
+    print_section("TOP 20 V3 FEATURES")
+
+    coefficients = get_coefficients(
         model,
-        list(X_train.columns),
-        metadata,
+        X_train.columns
     )
 
-    # ----------------------------------------------------------------------
-    # SAVE MODEL
-    # ----------------------------------------------------------------------
+    print(
+        coefficients[
+            [
+                "feature",
+                "coefficient",
+                "odds_ratio",
+            ]
+        ].head(20).to_string(
+            index=False
+        )
+    )
+
+    # ------------------------------------------------------------------
+    # Final VIF
+    # ------------------------------------------------------------------
+
+    print_section("FINAL VIF SUMMARY")
+
+    print(
+        final_vif.head(20).to_string(
+            index=False
+        )
+    )
+
+    print(
+        f"\nMaximum final VIF: "
+        f"{final_vif['vif'].max():.4f}"
+    )
+
+    print(
+        f"Features with VIF >= 5: "
+        f"{(final_vif['vif'] >= 5).sum()}"
+    )
+
+    print(
+        f"Features with VIF >= 10: "
+        f"{(final_vif['vif'] >= 10).sum()}"
+    )
+
+    # ------------------------------------------------------------------
+    # Save model
+    # ------------------------------------------------------------------
 
     MODEL_DIR.mkdir(
         parents=True,
-        exist_ok=True,
+        exist_ok=True
     )
+
+    model_bundle = {
+        "model": model,
+        "features": list(X_train.columns),
+        "core_features": selected_features,
+        "missing_indicator_features": (
+            missing_indicator_features
+        ),
+        "training_medians": (
+            training_medians.to_dict()
+        ),
+        "vif_threshold": VIF_THRESHOLD,
+        "missingness_threshold": (
+            MISSINGNESS_THRESHOLD
+        ),
+        "protected_features": list(
+            PROTECTED_FEATURES
+        ),
+        "version": "v3",
+    }
 
     joblib.dump(
-        model,
-        MODEL_PATH,
+        model_bundle,
+        MODEL_PATH
     )
 
-    print()
-    print("Model saved to:")
-    print(
-        f"  {MODEL_PATH}"
-    )
+    # ------------------------------------------------------------------
+    # Save metrics
+    # ------------------------------------------------------------------
 
-    # ----------------------------------------------------------------------
-    # SAVE METRICS
-    # ----------------------------------------------------------------------
-
-    metrics = {
-        "model": (
-            "engineered_logistic_regression_v2"
-        ),
-
+    metrics_output = {
+        "model_version": "engineered_v3",
         "target": TARGET,
 
-        "n_training_rows": len(
-            train_df
+        "n_training_rows": len(train),
+        "n_validation_rows": len(validation),
+        "n_test_rows": len(test),
+
+        "initial_engineered_features": (
+            len(ADVANCED_METRIC_PAIRS)
         ),
 
-        "n_validation_rows": len(
-            validation_df
+        "final_core_features": (
+            len(selected_features)
         ),
 
-        "n_test_rows": len(
-            test_df
+        "missing_indicators": (
+            len(missing_indicator_features)
         ),
 
-        "n_engineered_features": (
+        "final_total_features": (
             X_train.shape[1]
         ),
 
-        "feature_categories": {
-            "elo": 1,
-            "scoring": 9,
-            "passing": 11,
-            "rushing": 6,
-            "total_offense": 4,
-            "defense": 9,
-            "turnovers": 4,
-            "possession": 1,
-            "situational": 6,
-            "penalties": 2,
-            "advanced_offense": 3,
-            "advanced_defense": 3,
-        },
+        "vif_threshold": VIF_THRESHOLD,
 
-        "training_metrics": train_metrics,
-
-        "validation_metrics": (
-            validation_metrics
+        "missingness_threshold": (
+            MISSINGNESS_THRESHOLD
         ),
 
-        "test_metrics": test_metrics,
+        "protected_features": list(
+            PROTECTED_FEATURES
+        ),
 
-        "engineering": {
-            "transformation": (
-                "home_minus_away"
-            ),
-
-            "uses_absolute_elo": False,
-
-            "uses_elo_difference": True,
-
-            "excludes_games_before": True,
-
-            "uses_explicit_feature_spec": True,
-        },
+        "training": train_metrics,
+        "validation": validation_metrics,
+        "test": test_metrics,
     }
 
     with open(
         METRICS_PATH,
         "w",
-        encoding="utf-8",
-    ) as file:
-
+        encoding="utf-8"
+    ) as f:
         json.dump(
-            metrics,
-            file,
-            indent=4,
+            metrics_output,
+            f,
+            indent=4
         )
 
-    print()
-    print("Metrics saved to:")
+    # ------------------------------------------------------------------
+    # Save feature selection metadata
+    # ------------------------------------------------------------------
+
+    feature_selection_output = {
+        "version": "v3",
+
+        "initial_features": list(
+            ADVANCED_METRIC_PAIRS
+        ),
+
+        "selected_core_features": (
+            selected_features
+        ),
+
+        "removed_features": [
+            feature
+            for feature in ADVANCED_METRIC_PAIRS
+            if f"matchup_{feature}" not in selected_features
+            and not (
+                feature == "elo"
+                and "matchup_elo"
+                in selected_features
+            )
+        ],
+
+        "missing_indicator_features": (
+            missing_indicator_features
+        ),
+
+        "protected_features": list(
+            PROTECTED_FEATURES
+        ),
+
+        "vif_threshold": VIF_THRESHOLD,
+
+        "missingness_threshold": (
+            MISSINGNESS_THRESHOLD
+        ),
+    }
+
+    with open(
+        FEATURE_SELECTION_PATH,
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(
+            feature_selection_output,
+            f,
+            indent=4
+        )
+
+    # ------------------------------------------------------------------
+    # Save VIF history
+    # ------------------------------------------------------------------
+
+    if not vif_history.empty:
+        vif_history.to_csv(
+            VIF_PATH,
+            index=False
+        )
+
+    final_vif.to_csv(
+        MODEL_DIR / "engineered_v3_final_vif.csv",
+        index=False
+    )
+
+    # ------------------------------------------------------------------
+    # Save missingness diagnostics
+    # ------------------------------------------------------------------
+
+    missingness.to_csv(
+        MISSINGNESS_PATH,
+        index=False
+    )
+
+    # ------------------------------------------------------------------
+    # Final summary
+    # ------------------------------------------------------------------
+
+    print_section(
+        "ENGINEERED LOGISTIC REGRESSION V3 COMPLETE"
+    )
+
     print(
-        f"  {METRICS_PATH}"
-    )
-
-    # ----------------------------------------------------------------------
-    # FINAL SUMMARY
-    # ----------------------------------------------------------------------
-
-    print_header(
-        "ENGINEERED LOGISTIC REGRESSION V2 COMPLETE"
+        f"Training rows     : {len(train):,}"
     )
 
     print(
-        f"Training rows     : "
-        f"{len(train_df):,}"
+        f"Validation rows   : {len(validation):,}"
     )
 
     print(
-        f"Validation rows   : "
-        f"{len(validation_df):,}"
+        f"Test rows         : {len(test):,}"
     )
 
     print(
-        f"Test rows         : "
-        f"{len(test_df):,}"
+        f"Initial features  : "
+        f"{len(ADVANCED_METRIC_PAIRS)}"
     )
 
     print(
-        f"Engineered feats  : "
-        f"{X_train.shape[1]:,}"
+        f"Core features     : "
+        f"{len(selected_features)}"
     )
 
-    print()
     print(
-        "Validation Performance"
+        f"Missing indicators: "
+        f"{len(missing_indicator_features)}"
     )
+
+    print(
+        f"Final features    : "
+        f"{X_train.shape[1]}"
+    )
+
+    print(
+        f"Maximum VIF       : "
+        f"{final_vif['vif'].max():.4f}"
+    )
+
+    print("\nValidation Performance")
 
     print(
         f"  Accuracy        : "
@@ -1312,10 +1454,7 @@ def main():
         f"{validation_metrics['brier_score']:.4f}"
     )
 
-    print()
-    print(
-        "Test Performance"
-    )
+    print("\nTest Performance")
 
     print(
         f"  Accuracy        : "
@@ -1336,6 +1475,21 @@ def main():
         f"  Brier Score     : "
         f"{test_metrics['brier_score']:.4f}"
     )
+
+    print("\nModel saved to:")
+    print(f"  {MODEL_PATH}")
+
+    print("\nMetrics saved to:")
+    print(f"  {METRICS_PATH}")
+
+    print("\nFeature selection saved to:")
+    print(f"  {FEATURE_SELECTION_PATH}")
+
+    print("\nVIF history saved to:")
+    print(f"  {VIF_PATH}")
+
+    print("\nMissingness analysis saved to:")
+    print(f"  {MISSINGNESS_PATH}")
 
 
 if __name__ == "__main__":
