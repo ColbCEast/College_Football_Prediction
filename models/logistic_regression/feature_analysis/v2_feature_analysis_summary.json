@@ -1,0 +1,14 @@
+{
+    "engineered_feature_count": 60,
+    "correlation_threshold": 0.8,
+    "high_correlation_threshold": 0.9,
+    "correlation_pairs_above_threshold": 56,
+    "correlation_pairs_above_high_threshold": 22,
+    "vif_warning_threshold": 5.0,
+    "vif_high_threshold": 10.0,
+    "features_vif_above_warning": 53,
+    "features_vif_above_high": 40,
+    "features_missing_above_10pct": 60,
+    "features_missing_above_25pct": 12,
+    "features_missing_above_50pct": 0
+}

@@ -1,21 +1,22 @@
 """
-Train Engineered Logistic Regression Model
+Train V2 Engineered Logistic Regression Model
 
-This script trains a logistic regression model using engineered
-home-vs-away matchup features.
+V2 engineering strategy
+------------------------
+1. Explicitly select canonical pregame statistics.
+2. Create home-minus-away matchup differences.
+3. Use home Elo minus away Elo rather than separate Elo features.
+4. Include season-long and recent-form statistics where appropriate.
+5. Exclude bookkeeping / schedule-position features such as GamesBefore.
+6. Avoid semantically duplicated feature representations.
+7. Standardize using training data only.
+8. Preserve the existing temporal train / validation / test split.
 
-Engineering strategy:
-    - Convert paired home/away statistics into matchup differences
-    - Create home-vs-away Elo difference
-    - Preserve selected absolute strength features
-    - Remove identifiers and metadata
-    - Standardize using training data only
-    - Preserve temporal train/validation/test separation
-
-Target:
-    win_home
-        1 = home team wins
-        0 = away team wins
+Target
+------
+win_home
+    1 = home team wins
+    0 = away team wins
 """
 
 from pathlib import Path
@@ -54,15 +55,26 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 DATA_DIR = PROJECT_ROOT / "data" / "processed" / "modeling"
 
-# Adjust these names if your split script uses different filenames.
 TRAIN_PATH = DATA_DIR / "logistic_regression_train.csv"
 VALIDATION_PATH = DATA_DIR / "logistic_regression_validation.csv"
 TEST_PATH = DATA_DIR / "logistic_regression_test.csv"
 
 MODEL_DIR = PROJECT_ROOT / "models" / "logistic_regression"
-MODEL_PATH = MODEL_DIR / "logistic_regression_engineered.joblib"
-FEATURE_PATH = MODEL_DIR / "logistic_regression_engineered_features.csv"
-METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_metrics.json"
+
+MODEL_PATH = (
+    MODEL_DIR /
+    "logistic_regression_engineered_v2.joblib"
+)
+
+FEATURE_PATH = (
+    MODEL_DIR /
+    "logistic_regression_engineered_v2_features.csv"
+)
+
+METRICS_PATH = (
+    MODEL_DIR /
+    "logistic_regression_engineered_v2_metrics.json"
+)
 
 
 # ============================================================================
@@ -71,30 +83,454 @@ METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_metrics.json"
 
 TARGET = "win_home"
 
-IDENTIFIER_COLUMNS = [
-    "season",
-    "gameId",
-    "seasonType",
-    "startDate",
-]
-
-# Features where retaining the absolute home-team value makes conceptual sense.
-#
-# The matchup difference will still be created for these variables.
-PRESERVE_HOME_FEATURES = [
-    "homePregameElo",
-]
-
-# Features where retaining both absolute home and away values may be useful
-# in addition to their matchup difference.
-#
-# We intentionally keep this list small for the first pass.
-PRESERVE_ABSOLUTE_FEATURES = [
-    "homePregameElo",
-    "awayPregameElo",
-]
-
 RANDOM_STATE = 42
+
+
+# ============================================================================
+# CANONICAL FEATURE SPECIFICATION
+# ============================================================================
+#
+# Each entry represents one underlying football statistic.
+#
+# The script searches for the canonical home/away columns in priority order.
+#
+# We deliberately use only ONE representation of each statistic.
+#
+# We do NOT include:
+#   - GamesBefore
+#   - WinsBefore
+#   - raw cumulative counting statistics where an average exists
+#   - duplicate prefixed/non-prefixed representations
+#   - raw home/away Elo separately
+#
+# Instead, most statistics are represented as:
+#
+#     home_value - away_value
+#
+# ============================================================================
+
+
+FEATURE_SPEC = {
+
+    # ------------------------------------------------------------------------
+    # ELO / TEAM STRENGTH
+    # ------------------------------------------------------------------------
+
+    "elo": {
+        "home": ["homePregameElo"],
+        "away": ["awayPregameElo"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # SCORING
+    # ------------------------------------------------------------------------
+
+    "pointsForAvgBefore": {
+        "home": ["pointsForAvgBefore_home"],
+        "away": ["pointsForAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "pointsForAvgLast3": {
+        "home": ["pointsForAvgLast3_home"],
+        "away": ["pointsForAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "pointsForAvgLast5": {
+        "home": ["pointsForAvgLast5_home"],
+        "away": ["pointsForAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "pointsAgainstAvgBefore": {
+        "home": ["pointsAgainstAvgBefore_home"],
+        "away": ["pointsAgainstAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "pointsAgainstAvgLast3": {
+        "home": ["pointsAgainstAvgLast3_home"],
+        "away": ["pointsAgainstAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "pointsAgainstAvgLast5": {
+        "home": ["pointsAgainstAvgLast5_home"],
+        "away": ["pointsAgainstAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "pointDifferentialAvgBefore": {
+        "home": ["pointDifferentialAvgBefore_home"],
+        "away": ["pointDifferentialAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "pointDifferentialAvgLast3": {
+        "home": ["pointDifferentialAvgLast3_home"],
+        "away": ["pointDifferentialAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "pointDifferentialAvgLast5": {
+        "home": ["pointDifferentialAvgLast5_home"],
+        "away": ["pointDifferentialAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # PASSING
+    # ------------------------------------------------------------------------
+
+    "completionPctBefore": {
+        "home": ["completionPctBefore_home"],
+        "away": ["completionPctBefore_away"],
+        "transformation": "difference",
+    },
+
+    "completionsAvgBefore": {
+        "home": ["completionsAvgBefore_home"],
+        "away": ["completionsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "netPassingYardsAvgBefore": {
+        "home": ["netPassingYardsAvgBefore_home"],
+        "away": ["netPassingYardsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "netPassingYardsAvgLast3": {
+        "home": ["netPassingYardsAvgLast3_home"],
+        "away": ["netPassingYardsAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "netPassingYardsAvgLast5": {
+        "home": ["netPassingYardsAvgLast5_home"],
+        "away": ["netPassingYardsAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "passAttemptsAvgBefore": {
+        "home": ["passAttemptsAvgBefore_home"],
+        "away": ["passAttemptsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "yardsPerPassAttemptBefore": {
+        "home": ["yardsPerPassAttemptBefore_home"],
+        "away": ["yardsPerPassAttemptBefore_away"],
+        "transformation": "difference",
+    },
+
+    "passingTDsAvgBefore": {
+        "home": ["passingTDsAvgBefore_home"],
+        "away": ["passingTDsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "interceptionsAvgBefore": {
+        "home": ["interceptionsAvgBefore_home"],
+        "away": ["interceptionsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "passesDeflectedAvgBefore": {
+        "home": ["passesDeflectedAvgBefore_home"],
+        "away": ["passesDeflectedAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "passesDeflectedAvgLast3": {
+        "home": ["passesDeflectedAvgLast3_home"],
+        "away": ["passesDeflectedAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "passesDeflectedAvgLast5": {
+        "home": ["passesDeflectedAvgLast5_home"],
+        "away": ["passesDeflectedAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # RUSHING
+    # ------------------------------------------------------------------------
+
+    "rushingYardsAvgBefore": {
+        "home": ["rushingYardsAvgBefore_home"],
+        "away": ["rushingYardsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "rushingYardsAvgLast3": {
+        "home": ["rushingYardsAvgLast3_home"],
+        "away": ["rushingYardsAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "rushingYardsAvgLast5": {
+        "home": ["rushingYardsAvgLast5_home"],
+        "away": ["rushingYardsAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "rushingAttemptsAvgBefore": {
+        "home": ["rushingAttemptsAvgBefore_home"],
+        "away": ["rushingAttemptsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "rushingTDsAvgBefore": {
+        "home": ["rushingTDsAvgBefore_home"],
+        "away": ["rushingTDsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "yardsPerRushAttemptBefore": {
+        "home": ["yardsPerRushAttemptBefore_home"],
+        "away": ["yardsPerRushAttemptBefore_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # TOTAL OFFENSE
+    # ------------------------------------------------------------------------
+
+    "totalYardsAvgBefore": {
+        "home": ["totalYardsAvgBefore_home"],
+        "away": ["totalYardsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "totalYardsAvgLast3": {
+        "home": ["totalYardsAvgLast3_home"],
+        "away": ["totalYardsAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "totalYardsAvgLast5": {
+        "home": ["totalYardsAvgLast5_home"],
+        "away": ["totalYardsAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "firstDownsAvgBefore": {
+        "home": ["firstDownsAvgBefore_home"],
+        "away": ["firstDownsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # DEFENSE
+    # ------------------------------------------------------------------------
+
+    "tacklesForLossAvgBefore": {
+        "home": ["tacklesForLossAvgBefore_home"],
+        "away": ["tacklesForLossAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "tacklesForLossAvgLast3": {
+        "home": ["tacklesForLossAvgLast3_home"],
+        "away": ["tacklesForLossAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "tacklesForLossAvgLast5": {
+        "home": ["tacklesForLossAvgLast5_home"],
+        "away": ["tacklesForLossAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "qbHurriesAvgBefore": {
+        "home": ["qbHurriesAvgBefore_home"],
+        "away": ["qbHurriesAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "qbHurriesAvgLast3": {
+        "home": ["qbHurriesAvgLast3_home"],
+        "away": ["qbHurriesAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "qbHurriesAvgLast5": {
+        "home": ["qbHurriesAvgLast5_home"],
+        "away": ["qbHurriesAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "sacksAvgBefore": {
+        "home": ["sacksAvgBefore_home"],
+        "away": ["sacksAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "sacksAvgLast3": {
+        "home": ["sacksAvgLast3_home"],
+        "away": ["sacksAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "sacksAvgLast5": {
+        "home": ["sacksAvgLast5_home"],
+        "away": ["sacksAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # TURNOVERS / BALL SECURITY
+    # ------------------------------------------------------------------------
+
+    "turnoversAvgBefore": {
+        "home": ["turnoversAvgBefore_home"],
+        "away": ["turnoversAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "turnoversAvgLast3": {
+        "home": ["turnoversAvgLast3_home"],
+        "away": ["turnoversAvgLast3_away"],
+        "transformation": "difference",
+    },
+
+    "turnoversAvgLast5": {
+        "home": ["turnoversAvgLast5_home"],
+        "away": ["turnoversAvgLast5_away"],
+        "transformation": "difference",
+    },
+
+    "fumblesLostAvgBefore": {
+        "home": ["fumblesLostAvgBefore_home"],
+        "away": ["fumblesLostAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # POSSESSION
+    # ------------------------------------------------------------------------
+
+    "possessionSecondsAvgBefore": {
+        "home": ["possessionSecondsAvgBefore_home"],
+        "away": ["possessionSecondsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # SITUATIONAL FOOTBALL
+    # ------------------------------------------------------------------------
+
+    "thirdDownPctBefore": {
+        "home": ["thirdDownPctBefore_home"],
+        "away": ["thirdDownPctBefore_away"],
+        "transformation": "difference",
+    },
+
+    "thirdDownAttemptsAvgBefore": {
+        "home": ["thirdDownAttemptsAvgBefore_home"],
+        "away": ["thirdDownAttemptsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "thirdDownConversionsAvgBefore": {
+        "home": ["thirdDownConversionsAvgBefore_home"],
+        "away": ["thirdDownConversionsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "fourthDownPctBefore": {
+        "home": ["fourthDownPctBefore_home"],
+        "away": ["fourthDownPctBefore_away"],
+        "transformation": "difference",
+    },
+
+    "fourthDownAttemptsAvgBefore": {
+        "home": ["fourthDownAttemptsAvgBefore_home"],
+        "away": ["fourthDownAttemptsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "fourthDownConversionsAvgBefore": {
+        "home": ["fourthDownConversionsAvgBefore_home"],
+        "away": ["fourthDownConversionsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # PENALTIES
+    # ------------------------------------------------------------------------
+
+    "penaltiesAvgBefore": {
+        "home": ["penaltiesAvgBefore_home"],
+        "away": ["penaltiesAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+    "penaltyYardsAvgBefore": {
+        "home": ["penaltyYardsAvgBefore_home"],
+        "away": ["penaltyYardsAvgBefore_away"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # ADVANCED OFFENSE
+    # ------------------------------------------------------------------------
+
+    "offenseExplosiveness": {
+        "home": ["home_pregame_offense_explosiveness"],
+        "away": ["away_pregame_offense_explosiveness"],
+        "transformation": "difference",
+    },
+
+    "offensePPA": {
+        "home": ["home_pregame_offense_ppa"],
+        "away": ["away_pregame_offense_ppa"],
+        "transformation": "difference",
+    },
+
+    "offenseSuccessRate": {
+        "home": ["home_pregame_offense_successRate"],
+        "away": ["away_pregame_offense_successRate"],
+        "transformation": "difference",
+    },
+
+
+    # ------------------------------------------------------------------------
+    # ADVANCED DEFENSE
+    # ------------------------------------------------------------------------
+
+    "defenseExplosiveness": {
+        "home": ["home_pregame_defense_explosiveness"],
+        "away": ["away_pregame_defense_explosiveness"],
+        "transformation": "difference",
+    },
+
+    "defensePPA": {
+        "home": ["home_pregame_defense_ppa"],
+        "away": ["away_pregame_defense_ppa"],
+        "transformation": "difference",
+    },
+
+    "defenseSuccessRate": {
+        "home": ["home_pregame_defense_successRate"],
+        "away": ["away_pregame_defense_successRate"],
+        "transformation": "difference",
+    },
+}
 
 
 # ============================================================================
@@ -121,7 +557,7 @@ def load_split(path, split_name):
         raise FileNotFoundError(
             f"\nCould not find {split_name} file:\n"
             f"  {path}\n\n"
-            f"Check the output paths used by split_logistic_regression.py."
+            f"Check the paths used by split_logistic_regression.py."
         )
 
     df = pd.read_csv(path)
@@ -132,345 +568,141 @@ def load_split(path, split_name):
 
 
 # ============================================================================
-# COLUMN IDENTIFICATION
+# COLUMN RESOLUTION
 # ============================================================================
 
-def remove_identifiers(df):
-    """Remove identifiers and metadata from model input."""
-
-    columns_to_remove = [
-        column
-        for column in IDENTIFIER_COLUMNS
-        if column in df.columns
-    ]
-
-    columns_to_remove.append(TARGET)
-
-    existing = [
-        column
-        for column in columns_to_remove
-        if column in df.columns
-    ]
-
-    X = df.drop(columns=existing, errors="ignore")
-
-    return X
-
-
-def canonical_feature_name(column):
+def resolve_column(df, candidates):
     """
-    Convert a feature into a canonical statistic name.
+    Find the first available candidate column.
 
-    Examples:
-
-        homePointsForAvgBefore_home
-            -> pointsForAvgBefore
-
-        awayPointsForAvgBefore_away
-            -> pointsForAvgBefore
-
-        pointsForAvgBefore_home
-            -> pointsForAvgBefore
-
-        pointsForAvgBefore_away
-            -> pointsForAvgBefore
-
-    This allows the script to recognize redundant home/away representations.
+    Candidates are ordered by preference.
     """
 
-    name = column
-
-    # Remove the side suffix.
-    if name.endswith("_home"):
-        name = name[:-5]
-    elif name.endswith("_away"):
-        name = name[:-5]
-
-    # Remove leading home/away prefixes.
-    if name.startswith("home"):
-        name = name[4:]
-    elif name.startswith("away"):
-        name = name[4:]
-
-    return name
-
-
-def get_side(column):
-    """Determine whether a column represents home or away data."""
-
-    if column.endswith("_home"):
-        return "home"
-
-    if column.endswith("_away"):
-        return "away"
+    for column in candidates:
+        if column in df.columns:
+            return column
 
     return None
 
 
-# ============================================================================
-# DUPLICATE FEATURE HANDLING
-# ============================================================================
-
-def remove_exact_duplicate_columns(df):
+def validate_feature_spec(df):
     """
-    Remove columns that contain exactly the same values.
-
-    The feature-building pipeline contains some duplicated representations,
-    such as:
-
-        homePointsForAvgBefore_home
-        pointsForAvgBefore_home
-
-    If they contain identical values, keeping both gives logistic regression
-    redundant predictors without adding information.
+    Validate that every requested canonical feature can be constructed.
     """
 
-    print_header("REMOVING EXACT DUPLICATE FEATURES")
+    missing = []
 
-    duplicate_columns = []
-    columns = list(df.columns)
+    for feature_name, specification in FEATURE_SPEC.items():
 
-    for i, column in enumerate(columns):
-        if column in duplicate_columns:
-            continue
+        home_column = resolve_column(
+            df,
+            specification["home"],
+        )
 
-        for other in columns[i + 1:]:
-            if other in duplicate_columns:
-                continue
+        away_column = resolve_column(
+            df,
+            specification["away"],
+        )
 
-            if df[column].equals(df[other]):
-                duplicate_columns.append(other)
+        if home_column is None:
+            missing.append(
+                f"{feature_name}: HOME missing "
+                f"{specification['home']}"
+            )
 
-    if duplicate_columns:
-        print(f"Exact duplicate columns found: {len(duplicate_columns)}")
+        if away_column is None:
+            missing.append(
+                f"{feature_name}: AWAY missing "
+                f"{specification['away']}"
+            )
 
-        for column in duplicate_columns:
-            print(f"  Removing: {column}")
+    if missing:
+        print()
+        print("MISSING FEATURE COLUMNS")
+        print("-" * 70)
 
-        df = df.drop(columns=duplicate_columns)
+        for item in missing:
+            print(f"  {item}")
 
-    else:
-        print("No exact duplicate columns found.")
-
-    return df, duplicate_columns
+        raise ValueError(
+            f"\n{len(missing)} required feature columns could not be resolved."
+        )
 
 
 # ============================================================================
-# MATCHUP FEATURE ENGINEERING
+# FEATURE ENGINEERING
 # ============================================================================
 
-def build_home_away_groups(df):
+def engineer_features(df, split_name):
     """
-    Build groups of home/away columns representing the same statistic.
-
-    Returns:
-
-        {
-            canonical_name: {
-                "home": [columns...],
-                "away": [columns...]
-            }
-        }
+    Construct the explicit V2 matchup feature matrix.
     """
 
-    groups = {}
+    print_header(
+        f"ENGINEERING V2 FEATURES: {split_name.upper()}"
+    )
 
-    for column in df.columns:
+    validate_feature_spec(df)
 
-        side = get_side(column)
+    engineered = pd.DataFrame(index=df.index)
 
-        if side is None:
-            continue
+    metadata = []
 
-        canonical = canonical_feature_name(column)
+    for feature_name, specification in FEATURE_SPEC.items():
 
-        if canonical not in groups:
-            groups[canonical] = {
-                "home": [],
-                "away": [],
-            }
+        home_column = resolve_column(
+            df,
+            specification["home"],
+        )
 
-        groups[canonical][side].append(column)
-
-    return groups
-
-
-def choose_column(columns):
-    """
-    Choose a representative column from a set of equivalent columns.
-
-    Preference:
-        1. Generic feature name
-        2. Explicit home/away-prefixed feature
-
-    Example:
-
-        completionPctBefore_home
-        homeCompletionPctBefore_home
-
-    -> completionPctBefore_home
-    """
-
-    if not columns:
-        return None
-
-    generic = [
-        column
-        for column in columns
-        if not column.startswith("home")
-        and not column.startswith("away")
-    ]
-
-    if generic:
-        return sorted(generic)[0]
-
-    return sorted(columns)[0]
-
-
-def create_matchup_features(X):
-    """
-    Create home-minus-away matchup features.
-
-    For every statistic represented on both sides:
-
-        matchup_feature = home_value - away_value
-
-    Example:
-
-        homePointsForAvgBefore_home
-        awayPointsForAvgBefore_away
-
-    becomes:
-
-        matchup_pointsForAvgBefore
-
-    """
-
-    print_header("ENGINEERING MATCHUP FEATURES")
-
-    X = X.copy()
-
-    groups = build_home_away_groups(X)
-
-    engineered = pd.DataFrame(index=X.index)
-
-    created_features = []
-    skipped_features = []
-
-    for canonical, sides in sorted(groups.items()):
-
-        home_column = choose_column(sides["home"])
-        away_column = choose_column(sides["away"])
-
-        if home_column is None or away_column is None:
-            skipped_features.append(canonical)
-            continue
+        away_column = resolve_column(
+            df,
+            specification["away"],
+        )
 
         home_values = pd.to_numeric(
-            X[home_column],
+            df[home_column],
             errors="coerce",
         )
 
         away_values = pd.to_numeric(
-            X[away_column],
+            df[away_column],
             errors="coerce",
         )
 
-        # Only create differences for numeric data.
-        if not (
-            pd.api.types.is_numeric_dtype(home_values)
-            and pd.api.types.is_numeric_dtype(away_values)
-        ):
-            skipped_features.append(canonical)
-            continue
+        if specification["transformation"] == "difference":
 
-        feature_name = f"matchup_{canonical}"
+            engineered_name = (
+                f"matchup_{feature_name}"
+            )
 
-        engineered[feature_name] = home_values - away_values
+            engineered[engineered_name] = (
+                home_values - away_values
+            )
 
-        created_features.append(
-            {
-                "feature": feature_name,
-                "home_source": home_column,
-                "away_source": away_column,
-                "transformation": "home_minus_away",
-            }
-        )
+            metadata.append(
+                {
+                    "feature": engineered_name,
+                    "home_source": home_column,
+                    "away_source": away_column,
+                    "transformation": "home_minus_away",
+                }
+            )
 
-    print(f"Paired statistics found: {len(created_features)}")
-    print(f"Matchup features created: {len(created_features)}")
-    print(f"Unpaired/skipped statistics: {len(skipped_features)}")
+        else:
+            raise ValueError(
+                f"Unknown transformation for {feature_name}: "
+                f"{specification['transformation']}"
+            )
 
-    return engineered, created_features
+    print(f"Canonical statistics selected: {len(FEATURE_SPEC)}")
+    print(f"Engineered matchup features: {engineered.shape[1]}")
 
-
-# ============================================================================
-# ABSOLUTE FEATURE ENGINEERING
-# ============================================================================
-
-def add_selected_absolute_features(X, engineered):
-    """
-    Preserve a small number of absolute strength features.
-
-    The first version intentionally only preserves pregame Elo.
-    """
-
-    print_header("ADDING SELECTED ABSOLUTE FEATURES")
-
-    added = []
-
-    for column in PRESERVE_ABSOLUTE_FEATURES:
-
-        if column not in X.columns:
-            print(f"  Not found: {column}")
-            continue
-
-        values = pd.to_numeric(
-            X[column],
-            errors="coerce",
-        )
-
-        engineered[column] = values
-        added.append(column)
-
-        print(f"  Added: {column}")
-
-    print(f"Absolute features added: {len(added)}")
-
-    return engineered
+    return engineered, metadata
 
 
 # ============================================================================
-# FEATURE ENGINEERING PIPELINE
-# ============================================================================
-
-def engineer_features(df, split_name):
-    """Create the engineered feature matrix for one split."""
-
-    print_header(f"FEATURE ENGINEERING: {split_name.upper()}")
-
-    X = remove_identifiers(df)
-
-    print(f"Original model columns: {X.shape[1]}")
-
-    X, duplicate_columns = remove_exact_duplicate_columns(X)
-
-    engineered, matchup_metadata = create_matchup_features(X)
-
-    engineered = add_selected_absolute_features(
-        X,
-        engineered,
-    )
-
-    print()
-    print(f"Original usable columns : {X.shape[1]}")
-    print(f"Engineered columns      : {engineered.shape[1]}")
-
-    return engineered, matchup_metadata, duplicate_columns
-
-
-# ============================================================================
-# VALIDATION
+# TARGET VALIDATION
 # ============================================================================
 
 def validate_target(df, split_name):
@@ -485,17 +717,32 @@ def validate_target(df, split_name):
 
     if not set(values).issubset({0, 1}):
         raise ValueError(
-            f"{split_name} target contains values other than 0/1: {values}"
+            f"{split_name} target contains values other than 0/1: "
+            f"{values}"
         )
 
     print(
-        f"{split_name} target distribution:\n"
-        f"{df[TARGET].value_counts().sort_index().to_string()}"
+        f"{split_name} target distribution:"
+    )
+
+    print(
+        df[TARGET]
+        .value_counts()
+        .sort_index()
+        .to_string()
     )
 
 
-def validate_feature_alignment(X_train, X_validation, X_test):
-    """Ensure all splits have identical feature columns."""
+# ============================================================================
+# FEATURE VALIDATION
+# ============================================================================
+
+def validate_feature_alignment(
+    X_train,
+    X_validation,
+    X_test,
+):
+    """Ensure temporal splits have identical feature columns."""
 
     train_columns = list(X_train.columns)
     validation_columns = list(X_validation.columns)
@@ -511,7 +758,10 @@ def validate_feature_alignment(X_train, X_validation, X_test):
             "Training and test engineered features do not align."
         )
 
-    print(f"Feature alignment verified: {len(train_columns)} features")
+    print(
+        f"Feature alignment verified: "
+        f"{len(train_columns)} features"
+    )
 
 
 # ============================================================================
@@ -520,17 +770,18 @@ def validate_feature_alignment(X_train, X_validation, X_test):
 
 def create_model():
     """
-    Create the engineered logistic regression pipeline.
+    Create logistic regression pipeline.
 
-    Imputation and scaling are fitted only on the training data through
-    sklearn Pipeline.
+    Imputation and scaling are fitted only on training data.
     """
 
     return Pipeline(
         steps=[
             (
                 "imputer",
-                SimpleImputer(strategy="median"),
+                SimpleImputer(
+                    strategy="median"
+                ),
             ),
             (
                 "scaler",
@@ -551,23 +802,52 @@ def create_model():
 # EVALUATION
 # ============================================================================
 
-def evaluate_model(model, X, y, split_name):
-    """Evaluate the model on one temporal split."""
+def evaluate_model(
+    model,
+    X,
+    y,
+    split_name,
+):
+    """Evaluate model performance."""
 
     probabilities = model.predict_proba(X)[:, 1]
-    predictions = (probabilities >= 0.5).astype(int)
+
+    predictions = (
+        probabilities >= 0.5
+    ).astype(int)
 
     metrics = {
-        "accuracy": accuracy_score(y, predictions),
-        "balanced_accuracy": balanced_accuracy_score(y, predictions),
-        "roc_auc": roc_auc_score(y, probabilities),
-        "log_loss": log_loss(y, probabilities),
-        "brier_score": brier_score_loss(y, probabilities),
+        "accuracy": accuracy_score(
+            y,
+            predictions,
+        ),
+
+        "balanced_accuracy": balanced_accuracy_score(
+            y,
+            predictions,
+        ),
+
+        "roc_auc": roc_auc_score(
+            y,
+            probabilities,
+        ),
+
+        "log_loss": log_loss(
+            y,
+            probabilities,
+        ),
+
+        "brier_score": brier_score_loss(
+            y,
+            probabilities,
+        ),
+
         "precision": precision_score(
             y,
             predictions,
             zero_division=0,
         ),
+
         "recall": recall_score(
             y,
             predictions,
@@ -575,17 +855,28 @@ def evaluate_model(model, X, y, split_name):
         ),
     }
 
-    print_header(f"{split_name.upper()} PERFORMANCE")
+    print_header(
+        f"{split_name.upper()} PERFORMANCE"
+    )
 
     for metric, value in metrics.items():
-        print(f"{metric:20s}: {value:.4f}")
+        print(
+            f"{metric:20s}: {value:.4f}"
+        )
 
     print()
     print("Confusion Matrix:")
-    print(confusion_matrix(y, predictions))
+
+    print(
+        confusion_matrix(
+            y,
+            predictions,
+        )
+    )
 
     print()
     print("Classification Report:")
+
     print(
         classification_report(
             y,
@@ -602,20 +893,44 @@ def evaluate_model(model, X, y, split_name):
 # COEFFICIENT ANALYSIS
 # ============================================================================
 
-def save_feature_coefficients(model, feature_names):
-    """Save engineered feature coefficients."""
+def save_feature_coefficients(
+    model,
+    feature_names,
+    metadata,
+):
+    """
+    Save coefficients with source feature information.
+    """
 
-    logistic_model = model.named_steps["model"]
+    logistic_model = (
+        model.named_steps["model"]
+    )
 
-    coefficients = logistic_model.coef_[0]
+    coefficients = (
+        logistic_model.coef_[0]
+    )
 
     coefficient_df = pd.DataFrame(
         {
             "feature": feature_names,
             "coefficient": coefficients,
-            "absolute_coefficient": np.abs(coefficients),
-            "odds_ratio": np.exp(coefficients),
+            "absolute_coefficient": np.abs(
+                coefficients
+            ),
+            "odds_ratio": np.exp(
+                coefficients
+            ),
         }
+    )
+
+    metadata_df = pd.DataFrame(
+        metadata
+    )
+
+    coefficient_df = coefficient_df.merge(
+        metadata_df,
+        on="feature",
+        how="left",
     )
 
     coefficient_df = coefficient_df.sort_values(
@@ -643,8 +958,12 @@ def save_feature_coefficients(model, feature_names):
                 "feature",
                 "coefficient",
                 "odds_ratio",
+                "home_source",
+                "away_source",
             ]
-        ].head(20).to_string(index=False)
+        ]
+        .head(20)
+        .to_string(index=False)
     )
 
     return coefficient_df
@@ -656,13 +975,17 @@ def save_feature_coefficients(model, feature_names):
 
 def main():
 
-    print_header("TRAINING ENGINEERED LOGISTIC REGRESSION")
+    print_header(
+        "TRAINING ENGINEERED LOGISTIC REGRESSION V2"
+    )
 
     # ----------------------------------------------------------------------
-    # Load temporal splits
+    # LOAD DATA
     # ----------------------------------------------------------------------
 
-    print_header("LOADING TEMPORAL SPLITS")
+    print_header(
+        "LOADING TEMPORAL SPLITS"
+    )
 
     train_df = load_split(
         TRAIN_PATH,
@@ -680,43 +1003,58 @@ def main():
     )
 
     # ----------------------------------------------------------------------
-    # Validate targets
+    # VALIDATE TARGET
     # ----------------------------------------------------------------------
 
-    print_header("VALIDATING TARGETS")
+    print_header(
+        "VALIDATING TARGETS"
+    )
 
-    validate_target(train_df, "Training")
-    validate_target(validation_df, "Validation")
-    validate_target(test_df, "Test")
+    validate_target(
+        train_df,
+        "Training",
+    )
+
+    validate_target(
+        validation_df,
+        "Validation",
+    )
+
+    validate_target(
+        test_df,
+        "Test",
+    )
 
     y_train = train_df[TARGET]
     y_validation = validation_df[TARGET]
     y_test = test_df[TARGET]
 
     # ----------------------------------------------------------------------
-    # Engineer features
+    # ENGINEER FEATURES
     # ----------------------------------------------------------------------
 
-    X_train, matchup_metadata, duplicate_train = engineer_features(
+    X_train, metadata = engineer_features(
         train_df,
         "training",
     )
 
-    X_validation, _, duplicate_validation = engineer_features(
+    X_validation, validation_metadata = engineer_features(
         validation_df,
         "validation",
     )
 
-    X_test, _, duplicate_test = engineer_features(
+    X_test, test_metadata = engineer_features(
         test_df,
         "test",
     )
 
     # ----------------------------------------------------------------------
-    # Verify feature consistency
+    # VALIDATE FEATURE ALIGNMENT
     # ----------------------------------------------------------------------
 
-    print_header("VALIDATING ENGINEERED FEATURES")
+    print_header(
+        "VALIDATING ENGINEERED FEATURES"
+    )
 
     validate_feature_alignment(
         X_train,
@@ -725,10 +1063,52 @@ def main():
     )
 
     # ----------------------------------------------------------------------
-    # Train model
+    # CHECK MISSINGNESS
     # ----------------------------------------------------------------------
 
-    print_header("TRAINING LOGISTIC REGRESSION")
+    print_header(
+        "CHECKING ENGINEERED FEATURE MISSINGNESS"
+    )
+
+    missing_summary = (
+        X_train.isna()
+        .sum()
+        .sort_values(
+            ascending=False
+        )
+    )
+
+    missing_features = (
+        missing_summary[
+            missing_summary > 0
+        ]
+    )
+
+    if len(missing_features) == 0:
+
+        print(
+            "No missing values in engineered "
+            "training features."
+        )
+
+    else:
+
+        print(
+            f"Features containing missing values: "
+            f"{len(missing_features)}"
+        )
+
+        print(
+            missing_features.to_string()
+        )
+
+    # ----------------------------------------------------------------------
+    # TRAIN MODEL
+    # ----------------------------------------------------------------------
+
+    print_header(
+        "TRAINING LOGISTIC REGRESSION V2"
+    )
 
     model = create_model()
 
@@ -737,10 +1117,12 @@ def main():
         y_train,
     )
 
-    print("Model training complete.")
+    print(
+        "Model training complete."
+    )
 
     # ----------------------------------------------------------------------
-    # Evaluate
+    # EVALUATE
     # ----------------------------------------------------------------------
 
     train_metrics = evaluate_model(
@@ -765,16 +1147,17 @@ def main():
     )
 
     # ----------------------------------------------------------------------
-    # Save coefficients
+    # COEFFICIENT ANALYSIS
     # ----------------------------------------------------------------------
 
     coefficient_df = save_feature_coefficients(
         model,
         list(X_train.columns),
+        metadata,
     )
 
     # ----------------------------------------------------------------------
-    # Save model
+    # SAVE MODEL
     # ----------------------------------------------------------------------
 
     MODEL_DIR.mkdir(
@@ -788,33 +1171,73 @@ def main():
     )
 
     print()
-    print(f"Model saved to:")
-    print(f"  {MODEL_PATH}")
+    print("Model saved to:")
+    print(
+        f"  {MODEL_PATH}"
+    )
 
     # ----------------------------------------------------------------------
-    # Save metrics
+    # SAVE METRICS
     # ----------------------------------------------------------------------
 
     metrics = {
-        "model": "engineered_logistic_regression",
+        "model": (
+            "engineered_logistic_regression_v2"
+        ),
+
         "target": TARGET,
-        "n_training_rows": len(train_df),
-        "n_validation_rows": len(validation_df),
-        "n_test_rows": len(test_df),
-        "n_engineered_features": X_train.shape[1],
+
+        "n_training_rows": len(
+            train_df
+        ),
+
+        "n_validation_rows": len(
+            validation_df
+        ),
+
+        "n_test_rows": len(
+            test_df
+        ),
+
+        "n_engineered_features": (
+            X_train.shape[1]
+        ),
+
+        "feature_categories": {
+            "elo": 1,
+            "scoring": 9,
+            "passing": 11,
+            "rushing": 6,
+            "total_offense": 4,
+            "defense": 9,
+            "turnovers": 4,
+            "possession": 1,
+            "situational": 6,
+            "penalties": 2,
+            "advanced_offense": 3,
+            "advanced_defense": 3,
+        },
+
         "training_metrics": train_metrics,
-        "validation_metrics": validation_metrics,
+
+        "validation_metrics": (
+            validation_metrics
+        ),
+
         "test_metrics": test_metrics,
+
         "engineering": {
-            "matchup_features": len(matchup_metadata),
-            "exact_duplicate_columns_removed": len(
-                set(duplicate_train)
+            "transformation": (
+                "home_minus_away"
             ),
-            "absolute_features": [
-                column
-                for column in PRESERVE_ABSOLUTE_FEATURES
-                if column in X_train.columns
-            ],
+
+            "uses_absolute_elo": False,
+
+            "uses_elo_difference": True,
+
+            "excludes_games_before": True,
+
+            "uses_explicit_feature_spec": True,
         },
     }
 
@@ -830,48 +1253,88 @@ def main():
             indent=4,
         )
 
-    print(f"Metrics saved to:")
-    print(f"  {METRICS_PATH}")
+    print()
+    print("Metrics saved to:")
+    print(
+        f"  {METRICS_PATH}"
+    )
 
     # ----------------------------------------------------------------------
-    # Final summary
+    # FINAL SUMMARY
     # ----------------------------------------------------------------------
 
-    print_header("ENGINEERED LOGISTIC REGRESSION COMPLETE")
+    print_header(
+        "ENGINEERED LOGISTIC REGRESSION V2 COMPLETE"
+    )
 
-    print(f"Training rows     : {len(train_df):,}")
-    print(f"Validation rows   : {len(validation_df):,}")
-    print(f"Test rows         : {len(test_df):,}")
-    print(f"Engineered feats  : {X_train.shape[1]:,}")
+    print(
+        f"Training rows     : "
+        f"{len(train_df):,}"
+    )
+
+    print(
+        f"Validation rows   : "
+        f"{len(validation_df):,}"
+    )
+
+    print(
+        f"Test rows         : "
+        f"{len(test_df):,}"
+    )
+
+    print(
+        f"Engineered feats  : "
+        f"{X_train.shape[1]:,}"
+    )
 
     print()
-    print("Validation Performance")
     print(
-        f"  Accuracy        : {validation_metrics['accuracy']:.4f}"
+        "Validation Performance"
     )
+
     print(
-        f"  ROC-AUC         : {validation_metrics['roc_auc']:.4f}"
+        f"  Accuracy        : "
+        f"{validation_metrics['accuracy']:.4f}"
     )
+
     print(
-        f"  Log Loss        : {validation_metrics['log_loss']:.4f}"
+        f"  ROC-AUC         : "
+        f"{validation_metrics['roc_auc']:.4f}"
     )
+
     print(
-        f"  Brier Score     : {validation_metrics['brier_score']:.4f}"
+        f"  Log Loss        : "
+        f"{validation_metrics['log_loss']:.4f}"
+    )
+
+    print(
+        f"  Brier Score     : "
+        f"{validation_metrics['brier_score']:.4f}"
     )
 
     print()
-    print("Test Performance")
     print(
-        f"  Accuracy        : {test_metrics['accuracy']:.4f}"
+        "Test Performance"
     )
+
     print(
-        f"  ROC-AUC         : {test_metrics['roc_auc']:.4f}"
+        f"  Accuracy        : "
+        f"{test_metrics['accuracy']:.4f}"
     )
+
     print(
-        f"  Log Loss        : {test_metrics['log_loss']:.4f}"
+        f"  ROC-AUC         : "
+        f"{test_metrics['roc_auc']:.4f}"
     )
+
     print(
-        f"  Brier Score     : {test_metrics['brier_score']:.4f}"
+        f"  Log Loss        : "
+        f"{test_metrics['log_loss']:.4f}"
+    )
+
+    print(
+        f"  Brier Score     : "
+        f"{test_metrics['brier_score']:.4f}"
     )
 
 
