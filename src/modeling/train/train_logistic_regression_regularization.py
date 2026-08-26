@@ -1,22 +1,10 @@
 """
-train_logistic_regression_engineered.py
+train_logistic_regression_regularization.py
 
-Engineered Logistic Regression V4
+Engineered Logistic Regression V5
 
-Purpose
--------
-Train a temporally valid logistic regression model using:
-    1. V2 matchup/difference features
-    2. Iterative VIF-based feature reduction
-    3. Missingness indicators for substantially missing features
-    4. Training-only median imputation
-
-V4 goals
---------
-- Reduce multicollinearity that produced unstable/counterintuitive coefficients
-- Preserve conceptually important features
-- Allow missingness itself to carry predictive information
-- Maintain strict temporal separation between train/validation/test
+After handling multicollinearity and missingness,
+V5 will experiment with regularization
 """
 
 from pathlib import Path
@@ -60,19 +48,19 @@ TRAIN_PATH = DATA_DIR / "logistic_regression_train.csv"
 VALIDATION_PATH = DATA_DIR / "logistic_regression_validation.csv"
 TEST_PATH = DATA_DIR / "logistic_regression_test.csv"
 
-MODEL_PATH = MODEL_DIR / "logistic_regression_engineered_v4.joblib"
-METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_v4_metrics.json"
+MODEL_PATH = MODEL_DIR / "logistic_regression_engineered_v5.joblib"
+METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_v5_metrics.json"
 
 FEATURE_SELECTION_PATH = (
-    MODEL_DIR / "engineered_v4_selected_features.json"
+    MODEL_DIR / "engineered_v5_selected_features.json"
 )
 
 VIF_PATH = (
-    MODEL_DIR / "engineered_v4_vif_history.csv"
+    MODEL_DIR / "engineered_v5_vif_history.csv"
 )
 
 MISSINGNESS_PATH = (
-    MODEL_DIR / "engineered_v4_missingness.csv"
+    MODEL_DIR / "engineered_v5_missingness.csv"
 )
 
 
@@ -134,6 +122,16 @@ PROTECTED_FEATURES = {
 VIF_THRESHOLD = 5.0
 MISSINGNESS_THRESHOLD = 0.25
 
+# Values for Regularization test
+REGULARIZATION_C_VALUES = [
+    0.01,
+    0.03,
+    0.10,
+    0.30,
+    1.00,
+    3.00,
+    10.00,
+]
 
 # ======================================================================
 # UTILITY FUNCTIONS
@@ -947,7 +945,7 @@ def get_coefficients(model, feature_names):
 def main():
 
     print("\n" + "=" * 70)
-    print("TRAINING ENGINEERED LOGISTIC REGRESSION V4")
+    print("TRAINING ENGINEERED LOGISTIC REGRESSION V5")
     print("=" * 70)
 
     # ------------------------------------------------------------------
@@ -1098,6 +1096,23 @@ def main():
     )
 
     # ------------------------------------------------------------------
+    # STANDARDIZE FEATURES FOR REGULARIZED LOGISTIC REGRESSION
+    # ------------------------------------------------------------------
+
+    print_section("TRAINING-ONLY FEATURE STANDARDIZATION")
+
+    scaler = StandardScaler()
+
+    X_train_scaled = scaler.fit_transform(X_train)
+
+    X_validation_scaled = scaler.transform(X_validation)
+
+    X_test_scaled = scaler.transform(X_test)
+
+    print("Feature standardization complete.")
+    print("Scaler fitted on training data only.")
+
+    # ------------------------------------------------------------------
     # Final feature alignment
     # ------------------------------------------------------------------
 
@@ -1132,20 +1147,110 @@ def main():
     # Train model
     # ------------------------------------------------------------------
 
-    print_section("TRAINING LOGISTIC REGRESSION V4")
+    print_section("REGULARIZATION SWEEP")
+
+    regularization_results = []
+
+    for C in REGULARIZATION_C_VALUES:
+
+        print(f"\nTraining C={C}")
+
+        candidate_model = LogisticRegression(
+            C=C,
+            penalty="l2",
+            solver="lbfgs",
+            max_iter=5000,
+            random_state=42,
+        )
+
+        candidate_model.fit(
+            X_train_scaled,
+            y_train
+        )
+
+        validation_probabilities = (
+            candidate_model.predict_proba(
+                X_validation_scaled
+            )[:, 1]
+        )
+
+        validation_predictions = (
+            candidate_model.predict(
+                X_validation_scaled
+            )
+        )
+
+        result = {
+            "C": C,
+            "validation_accuracy": accuracy_score(
+                y_validation,
+                validation_predictions
+            ),
+            "validation_balanced_accuracy": (
+                balanced_accuracy_score(
+                    y_validation,
+                    validation_predictions
+                )
+            ),
+            "validation_roc_auc": (
+                roc_auc_score(
+                    y_validation,
+                    validation_probabilities
+                )
+            ),
+            "validation_log_loss": (
+                log_loss(
+                    y_validation,
+                    validation_probabilities
+                )
+            ),
+            "validation_brier_score": (
+                brier_score_loss(
+                    y_validation,
+                    validation_probabilities
+                )
+            ),
+        }
+
+        regularization_results.append(result)
+
+    regularization_results = pd.DataFrame(
+        regularization_results
+    )
+
+    print("\nREGULARIZATION RESULTS")
+    print("-" * 70)
+
+    print(
+        regularization_results.to_string(
+            index=False
+        )
+    )
+
+    best_result = regularization_results.loc[
+        regularization_results[
+            "validation_log_loss"
+        ].idxmin()
+    ]
+
+    best_C = best_result["C"]
+
+    print(
+        f"\nSelected C based on validation log loss: "
+        f"{best_C}"
+    )
 
     model = LogisticRegression(
-        max_iter=5000,
-        solver="lbfgs",
-        random_state=42,
+        max_iter = 5000,
+        solver = "lbfgs",
+        random_state = 42,
+        C = best_C,
     )
 
     model.fit(
         X_train,
         y_train
     )
-
-    print("Model training complete.")
 
     # ------------------------------------------------------------------
     # Evaluate
@@ -1176,7 +1281,7 @@ def main():
     # Coefficients
     # ------------------------------------------------------------------
 
-    print_section("TOP 20 V4 FEATURES")
+    print_section("TOP 20 V5 FEATURES")
 
     coefficients = get_coefficients(
         model,
@@ -1248,7 +1353,7 @@ def main():
         "protected_features": list(
             PROTECTED_FEATURES
         ),
-        "version": "v4",
+        "version": "v5",
     }
 
     joblib.dump(
@@ -1391,7 +1496,7 @@ def main():
     # ------------------------------------------------------------------
 
     print_section(
-        "ENGINEERED LOGISTIC REGRESSION V4 COMPLETE"
+        "ENGINEERED LOGISTIC REGRESSION V5 COMPLETE"
     )
 
     print(

@@ -1,0 +1,43 @@
+{
+    "model_version": "engineered_v4",
+    "target": "win_home",
+    "n_training_rows": 6432,
+    "n_validation_rows": 1741,
+    "n_test_rows": 888,
+    "initial_engineered_features": 6,
+    "final_core_features": 29,
+    "missing_indicators": 7,
+    "final_total_features": 36,
+    "vif_threshold": 5.0,
+    "missingness_threshold": 0.25,
+    "protected_features": [
+        "matchup_elo"
+    ],
+    "training": {
+        "accuracy": 0.7495335820895522,
+        "balanced_accuracy": 0.7121289945040195,
+        "roc_auc": 0.8025580723529535,
+        "log_loss": 0.5150015990570659,
+        "brier_score": 0.17011433030631778,
+        "precision": 0.7662021676620216,
+        "recall": 0.8621204579392733
+    },
+    "validation": {
+        "accuracy": 0.7535898908673176,
+        "balanced_accuracy": 0.7142396108503672,
+        "roc_auc": 0.8042354503460912,
+        "log_loss": 0.5135049677762666,
+        "brier_score": 0.16974836599239332,
+        "precision": 0.7769607843137255,
+        "recall": 0.8590785907859079
+    },
+    "test": {
+        "accuracy": 0.759009009009009,
+        "balanced_accuracy": 0.7189229618548991,
+        "roc_auc": 0.8111138812709493,
+        "log_loss": 0.5010338931585079,
+        "brier_score": 0.16566999555813078,
+        "precision": 0.7881219903691814,
+        "recall": 0.8568935427574171
+    }
+}
