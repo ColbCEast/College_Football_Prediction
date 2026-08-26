@@ -1,7 +1,7 @@
 """
 train_logistic_regression_engineered.py
 
-Engineered Logistic Regression V3
+Engineered Logistic Regression V4
 
 Purpose
 -------
@@ -11,7 +11,7 @@ Train a temporally valid logistic regression model using:
     3. Missingness indicators for substantially missing features
     4. Training-only median imputation
 
-V3 goals
+V4 goals
 --------
 - Reduce multicollinearity that produced unstable/counterintuitive coefficients
 - Preserve conceptually important features
@@ -60,19 +60,19 @@ TRAIN_PATH = DATA_DIR / "logistic_regression_train.csv"
 VALIDATION_PATH = DATA_DIR / "logistic_regression_validation.csv"
 TEST_PATH = DATA_DIR / "logistic_regression_test.csv"
 
-MODEL_PATH = MODEL_DIR / "logistic_regression_engineered_v3.joblib"
-METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_v3_metrics.json"
+MODEL_PATH = MODEL_DIR / "logistic_regression_engineered_v4.joblib"
+METRICS_PATH = MODEL_DIR / "logistic_regression_engineered_v4_metrics.json"
 
 FEATURE_SELECTION_PATH = (
-    MODEL_DIR / "engineered_v3_selected_features.json"
+    MODEL_DIR / "engineered_v4_selected_features.json"
 )
 
 VIF_PATH = (
-    MODEL_DIR / "engineered_v3_vif_history.csv"
+    MODEL_DIR / "engineered_v4_vif_history.csv"
 )
 
 MISSINGNESS_PATH = (
-    MODEL_DIR / "engineered_v3_missingness.csv"
+    MODEL_DIR / "engineered_v4_missingness.csv"
 )
 
 
@@ -127,7 +127,6 @@ ADVANCED_METRIC_PAIRS = {
 # features.
 PROTECTED_FEATURES = {
     "matchup_elo",
-    "matchup_pointDifferentialAvgBefore",
 }
 
 
@@ -948,7 +947,7 @@ def get_coefficients(model, feature_names):
 def main():
 
     print("\n" + "=" * 70)
-    print("TRAINING ENGINEERED LOGISTIC REGRESSION V3")
+    print("TRAINING ENGINEERED LOGISTIC REGRESSION V4")
     print("=" * 70)
 
     # ------------------------------------------------------------------
@@ -1133,7 +1132,7 @@ def main():
     # Train model
     # ------------------------------------------------------------------
 
-    print_section("TRAINING LOGISTIC REGRESSION V3")
+    print_section("TRAINING LOGISTIC REGRESSION V4")
 
     model = LogisticRegression(
         max_iter=5000,
@@ -1177,7 +1176,7 @@ def main():
     # Coefficients
     # ------------------------------------------------------------------
 
-    print_section("TOP 20 V3 FEATURES")
+    print_section("TOP 20 V4 FEATURES")
 
     coefficients = get_coefficients(
         model,
@@ -1262,7 +1261,7 @@ def main():
     # ------------------------------------------------------------------
 
     metrics_output = {
-        "model_version": "engineered_v3",
+        "model_version": "engineered_v4",
         "target": TARGET,
 
         "n_training_rows": len(train),
@@ -1316,7 +1315,7 @@ def main():
     # ------------------------------------------------------------------
 
     feature_selection_output = {
-        "version": "v3",
+        "version": "v4",
 
         "initial_features": list(
             ADVANCED_METRIC_PAIRS
@@ -1374,7 +1373,7 @@ def main():
         )
 
     final_vif.to_csv(
-        MODEL_DIR / "engineered_v3_final_vif.csv",
+        MODEL_DIR / "engineered_v4_final_vif.csv",
         index=False
     )
 
@@ -1392,7 +1391,7 @@ def main():
     # ------------------------------------------------------------------
 
     print_section(
-        "ENGINEERED LOGISTIC REGRESSION V3 COMPLETE"
+        "ENGINEERED LOGISTIC REGRESSION V4 COMPLETE"
     )
 
     print(
