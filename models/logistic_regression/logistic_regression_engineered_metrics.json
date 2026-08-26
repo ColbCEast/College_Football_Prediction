@@ -1,0 +1,43 @@
+{
+    "model": "engineered_logistic_regression",
+    "target": "win_home",
+    "n_training_rows": 6432,
+    "n_validation_rows": 1741,
+    "n_test_rows": 888,
+    "n_engineered_features": 150,
+    "training_metrics": {
+        "accuracy": 0.7601057213930348,
+        "balanced_accuracy": 0.7258000761280121,
+        "roc_auc": 0.8143667291719161,
+        "log_loss": 0.5038796047576476,
+        "brier_score": 0.165987438931908,
+        "precision": 0.7772798565987005,
+        "recall": 0.8633648581383773
+    },
+    "validation_metrics": {
+        "accuracy": 0.7340608845491097,
+        "balanced_accuracy": 0.6988827906154982,
+        "roc_auc": 0.781791524539851,
+        "log_loss": 0.5349613258158804,
+        "brier_score": 0.18004751638015273,
+        "precision": 0.7705882352941177,
+        "recall": 0.8283649503161699
+    },
+    "test_metrics": {
+        "accuracy": 0.75,
+        "balanced_accuracy": 0.7176597689686695,
+        "roc_auc": 0.7962104213413115,
+        "log_loss": 0.5180715503841243,
+        "brier_score": 0.1724692442715987,
+        "precision": 0.7929883138564274,
+        "recall": 0.8289703315881326
+    },
+    "engineering": {
+        "matchup_features": 148,
+        "exact_duplicate_columns_removed": 0,
+        "absolute_features": [
+            "homePregameElo",
+            "awayPregameElo"
+        ]
+    }
+}
