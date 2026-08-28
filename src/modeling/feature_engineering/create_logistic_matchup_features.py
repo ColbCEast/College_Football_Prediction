@@ -11,7 +11,7 @@ The resulting datasets contain four nested feature sets:
     Model 1: Compact baseline
     Model 2: Compact baseline + recent form
     Model 3: Compact baseline + recent form + SOS
-    Model 4: Reserved for later expansion
+    Model 4: Model 3 + additional matchup dimensions
 
 All matchup features are oriented so that:
 
@@ -34,9 +34,22 @@ Each output file contains:
     - Model 1 features
     - Model 2 features
     - Model 3 features
+    - Model 4 features
 
-Model 4 is intentionally not populated yet. It will be determined after
-evaluating Models 1–3.
+Model 4 adds seven features intended to capture dimensions not fully
+represented by Models 1–3:
+
+    - turnovers
+    - third-down efficiency
+    - sacks
+    - completion percentage
+    - total offensive production
+    - possession time
+    - penalty yards
+
+The purpose of Model 4 is NOT to maximize feature count. It is a controlled
+extension designed to test whether these additional football dimensions
+provide meaningful out-of-sample predictive information beyond Model 3.
 """
 
 from pathlib import Path
@@ -197,6 +210,10 @@ MODEL_2_FEATURES = {
 # -------------------------------------------------------------------------
 # MODEL 3 — ADD PRIOR STRENGTH OF SCHEDULE
 # -------------------------------------------------------------------------
+#
+# These features adjust team strength for the quality of opponents faced
+# before the current game.
+# -------------------------------------------------------------------------
 
 MODEL_3_FEATURES = {
     "priorSOSWinPctDiff": (
@@ -213,12 +230,106 @@ MODEL_3_FEATURES = {
 }
 
 
-# Model 4 deliberately remains empty for now.
+# -------------------------------------------------------------------------
+# MODEL 4 — ADDITIONAL KEY FOOTBALL DIMENSIONS
+# -------------------------------------------------------------------------
 #
-# We will select additional features only after seeing whether Models 1–3
-# leave meaningful predictive value on the table.
+# Model 4 intentionally adds only a small number of carefully selected
+# features rather than opening the model to the full feature set.
+#
+# These features are intended to capture information that Model 3 does not
+# fully represent:
+#
+#   turnovers:
+#       ball security / turnover tendency
+#
+#   third-down percentage:
+#       ability to sustain drives and convert key downs
+#
+#   sacks:
+#       pass-rush / pass-protection performance
+#
+#   completion percentage:
+#       passing efficiency / offensive style
+#
+#   total yards:
+#       broader offensive production beyond yards per play
+#
+#   possession seconds:
+#       time-of-possession / drive-control style
+#
+#   penalty yards:
+#       discipline / hidden yardage
+#
+# All are oriented so:
+#
+#     positive -> better for home team
+# -------------------------------------------------------------------------
 
-MODEL_4_FEATURES = {}
+MODEL_4_FEATURES = {
+    # Higher turnover averages are worse.
+    #
+    # Therefore:
+    #
+    #     away turnovers - home turnovers
+    #
+    # Positive -> home has the better turnover profile.
+    "turnoversAvgDiff": (
+        "turnoversAvgBefore_home",
+        "turnoversAvgBefore_away",
+        -1,
+    ),
+
+    # Higher third-down conversion percentage is better.
+    "thirdDownPctDiff": (
+        "thirdDownPctBefore_home",
+        "thirdDownPctBefore_away",
+        1,
+    ),
+
+    # Higher sack averages are treated as better defensive/pass-rush
+    # production.
+    "sacksAvgDiff": (
+        "sacksAvgBefore_home",
+        "sacksAvgBefore_away",
+        1,
+    ),
+
+    # Higher completion percentage is better.
+    "completionPctDiff": (
+        "completionPctBefore_home",
+        "completionPctBefore_away",
+        1,
+    ),
+
+    # Higher total offensive yards is better.
+    "totalYardsAvgDiff": (
+        "totalYardsAvgBefore_home",
+        "totalYardsAvgBefore_away",
+        1,
+    ),
+
+    # Higher possession time is treated as a distinct offensive/drive-control
+    # characteristic.
+    "possessionSecondsAvgDiff": (
+        "possessionSecondsAvgBefore_home",
+        "possessionSecondsAvgBefore_away",
+        1,
+    ),
+
+    # Higher penalty yards are worse.
+    #
+    # Therefore:
+    #
+    #     away penalty yards - home penalty yards
+    #
+    # Positive -> home is more disciplined.
+    "penaltyYardsAvgDiff": (
+        "penaltyYardsAvgBefore_home",
+        "penaltyYardsAvgBefore_away",
+        -1,
+    ),
+}
 
 
 # =============================================================================
@@ -237,7 +348,9 @@ def print_section(title):
 def fail(message):
     """Raise a validation error with a clear message."""
 
-    raise ValueError(f"\nVALIDATION FAILED:\n{message}")
+    raise ValueError(
+        f"\nVALIDATION FAILED:\n{message}"
+    )
 
 
 def find_game_id_column(df):
@@ -261,10 +374,14 @@ def find_game_id_column(df):
 def validate_input_structure(df, year):
     """Validate the source enhanced feature dataset."""
 
-    print_section(f"VALIDATING INPUT STRUCTURE — {year}")
+    print_section(
+        f"VALIDATING INPUT STRUCTURE — {year}"
+    )
 
     if df.empty:
-        fail(f"{year}: Input dataset is empty.")
+        fail(
+            f"{year}: Input dataset is empty."
+        )
 
     if TARGET_COLUMN not in df.columns:
         fail(
@@ -280,6 +397,7 @@ def validate_input_structure(df, year):
         )
 
     if df[game_id].duplicated().any():
+
         duplicate_count = int(
             df[game_id].duplicated().sum()
         )
@@ -289,20 +407,37 @@ def validate_input_structure(df, year):
         )
 
     target_values = set(
-        df[TARGET_COLUMN].dropna().unique()
+        df[TARGET_COLUMN]
+        .dropna()
+        .unique()
     )
 
     if not target_values.issubset({0, 1}):
+
         fail(
             f"{year}: Target contains unexpected values: "
             f"{sorted(target_values)}"
         )
 
-    print(f"Input rows:       {len(df):,}")
-    print(f"Input columns:    {len(df.columns):,}")
-    print(f"Game ID column:   {game_id}")
-    print(f"Target:           {TARGET_COLUMN}")
-    print("Input structure:  VALID")
+    print(
+        f"Input rows:       {len(df):,}"
+    )
+
+    print(
+        f"Input columns:    {len(df.columns):,}"
+    )
+
+    print(
+        f"Game ID column:   {game_id}"
+    )
+
+    print(
+        f"Target:           {TARGET_COLUMN}"
+    )
+
+    print(
+        "Input structure:  VALID"
+    )
 
     return game_id
 
@@ -319,10 +454,13 @@ def validate_required_columns(
 
     missing = []
 
-    for output_name, (
-        home_column,
-        away_column,
-        orientation,
+    for (
+        output_name,
+        (
+            home_column,
+            away_column,
+            orientation,
+        ),
     ) in feature_definitions.items():
 
         if home_column not in df.columns:
@@ -332,7 +470,10 @@ def validate_required_columns(
             missing.append(away_column)
 
     if missing:
-        missing = sorted(set(missing))
+
+        missing = sorted(
+            set(missing)
+        )
 
         fail(
             f"{year}: {model_name} is missing required source columns:\n"
@@ -375,7 +516,9 @@ def create_difference_feature(
         errors="coerce",
     )
 
-    return orientation * (home - away)
+    return orientation * (
+        home - away
+    )
 
 
 def create_feature_set(
@@ -401,17 +544,22 @@ def create_feature_set(
         index=df.index
     )
 
-    for output_name, (
-        home_column,
-        away_column,
-        orientation,
+    for (
+        output_name,
+        (
+            home_column,
+            away_column,
+            orientation,
+        ),
     ) in feature_definitions.items():
 
-        result[output_name] = create_difference_feature(
-            df=df,
-            home_column=home_column,
-            away_column=away_column,
-            orientation=orientation,
+        result[output_name] = (
+            create_difference_feature(
+                df=df,
+                home_column=home_column,
+                away_column=away_column,
+                orientation=orientation,
+            )
         )
 
     print(
@@ -419,7 +567,9 @@ def create_feature_set(
     )
 
     for column in result.columns:
-        print(f"  {column}")
+        print(
+            f"  {column}"
+        )
 
     return result
 
@@ -445,6 +595,7 @@ def validate_feature_values(
     )
 
     if actual_columns != expected_columns:
+
         fail(
             f"{year}: {model_name} feature columns do not match "
             "expected order."
@@ -454,7 +605,10 @@ def validate_feature_values(
 
         values = feature_df[column]
 
-        if not pd.api.types.is_numeric_dtype(values):
+        if not pd.api.types.is_numeric_dtype(
+            values
+        ):
+
             fail(
                 f"{year}: {column} is not numeric."
             )
@@ -466,6 +620,7 @@ def validate_feature_values(
         if not np.isfinite(
             finite_values.to_numpy()
         ).all():
+
             fail(
                 f"{year}: {column} contains infinite values."
             )
@@ -492,8 +647,6 @@ def validate_orientation(
     """
     Verify that every difference feature has the intended orientation.
 
-    This is deliberately deterministic rather than statistical.
-
     For every row where both source values exist, the generated feature must
     equal the specified home-minus-away or away-minus-home calculation.
     """
@@ -502,10 +655,13 @@ def validate_orientation(
         f"VALIDATING FEATURE ORIENTATION — {year}"
     )
 
-    for output_name, (
-        home_column,
-        away_column,
-        orientation,
+    for (
+        output_name,
+        (
+            home_column,
+            away_column,
+            orientation,
+        ),
     ) in feature_definitions.items():
 
         expected = create_difference_feature(
@@ -515,7 +671,9 @@ def validate_orientation(
             orientation=orientation,
         )
 
-        actual = matchup_df[output_name]
+        actual = matchup_df[
+            output_name
+        ]
 
         valid = (
             expected.notna()
@@ -533,6 +691,7 @@ def validate_orientation(
         )
 
         if not matches.all():
+
             fail(
                 f"{year}: Orientation validation failed for "
                 f"{output_name}."
@@ -569,6 +728,7 @@ def validate_no_target_leakage(
     )
 
     if leaked:
+
         fail(
             f"{year}: Potential target/game-outcome leakage detected: "
             f"{sorted(leaked)}"
@@ -596,10 +756,13 @@ def validate_missingness(
         f"VALIDATING FEATURE MISSINGNESS — {year}"
     )
 
-    for output_name, (
-        home_column,
-        away_column,
-        orientation,
+    for (
+        output_name,
+        (
+            home_column,
+            away_column,
+            orientation,
+        ),
     ) in feature_definitions.items():
 
         expected_missing = (
@@ -614,6 +777,7 @@ def validate_missingness(
         if not expected_missing.equals(
             actual_missing
         ):
+
             fail(
                 f"{year}: Missingness mismatch for "
                 f"{output_name}."
@@ -625,7 +789,12 @@ def validate_missingness(
 
 
 def create_model_columns():
-    """Return the nested model feature lists."""
+    """
+    Return the nested model feature lists.
+
+    Model 4 contains all Model 3 features plus the seven additional
+    Model 4 features.
+    """
 
     model_1 = list(
         MODEL_1_FEATURES.keys()
@@ -633,17 +802,23 @@ def create_model_columns():
 
     model_2 = (
         model_1
-        + list(MODEL_2_FEATURES.keys())
+        + list(
+            MODEL_2_FEATURES.keys()
+        )
     )
 
     model_3 = (
         model_2
-        + list(MODEL_3_FEATURES.keys())
+        + list(
+            MODEL_3_FEATURES.keys()
+        )
     )
 
     model_4 = (
         model_3
-        + list(MODEL_4_FEATURES.keys())
+        + list(
+            MODEL_4_FEATURES.keys()
+        )
     )
 
     return {
@@ -668,17 +843,26 @@ def validate_model_nesting(year):
     model_3 = model_columns["model_3"]
     model_4 = model_columns["model_4"]
 
-    if not set(model_1).issubset(model_2):
+    if not set(model_1).issubset(
+        model_2
+    ):
+
         fail(
             f"{year}: Model 1 features are not contained in Model 2."
         )
 
-    if not set(model_2).issubset(model_3):
+    if not set(model_2).issubset(
+        model_3
+    ):
+
         fail(
             f"{year}: Model 2 features are not contained in Model 3."
         )
 
-    if not set(model_3).issubset(model_4):
+    if not set(model_3).issubset(
+        model_4
+    ):
+
         fail(
             f"{year}: Model 3 features are not contained in Model 4."
         )
@@ -721,8 +905,13 @@ def build_output_dataset(
 
     output = pd.DataFrame()
 
-    output[game_id] = source_df[game_id]
-    output["season"] = source_df["season"]
+    output[game_id] = source_df[
+        game_id
+    ]
+
+    output["season"] = source_df[
+        "season"
+    ]
 
     # Keep identifiers useful for inspection / evaluation if available.
     optional_columns = [
@@ -733,28 +922,34 @@ def build_output_dataset(
     ]
 
     for column in optional_columns:
+
         if column in source_df.columns:
-            output[column] = source_df[column]
+            output[column] = source_df[
+                column
+            ]
 
     output[TARGET_COLUMN] = source_df[
         TARGET_COLUMN
     ]
 
-    # Add all features once.
+    # Add all Model 4 features once.
     #
-    # Models are nested, so the same file can be used to select the
-    # appropriate subset during modeling.
-    for column in model_columns["model_3"]:
-        output[column] = matchup_features[column]
+    # Because Models 1–4 are nested, the Model 4 dataset contains every
+    # feature required by all four models.
+    for column in model_columns["model_4"]:
 
-    # Model 4 is intentionally empty at this point.
+        output[column] = matchup_features[
+            column
+        ]
 
     if len(output) != len(source_df):
+
         fail(
             f"{year}: Output row count changed."
         )
 
     if output[game_id].duplicated().any():
+
         fail(
             f"{year}: Duplicate game IDs introduced."
         )
@@ -762,6 +957,7 @@ def build_output_dataset(
     if not output[game_id].equals(
         source_df[game_id]
     ):
+
         fail(
             f"{year}: Game ordering changed during output construction."
         )
@@ -794,17 +990,20 @@ def validate_output_dataset(
     )
 
     if len(output) < MIN_ROWS:
+
         fail(
             f"{year}: Output contains only "
             f"{len(output)} rows."
         )
 
     if output[game_id].isna().any():
+
         fail(
             f"{year}: Output contains missing game IDs."
         )
 
     if output[game_id].duplicated().any():
+
         fail(
             f"{year}: Output contains duplicate game IDs."
         )
@@ -815,14 +1014,17 @@ def validate_output_dataset(
         .unique()
     )
 
-    if not target_values.issubset({0, 1}):
+    if not target_values.issubset(
+        {0, 1}
+    ):
+
         fail(
             f"{year}: Invalid target values: "
             f"{sorted(target_values)}"
         )
 
     expected_features = (
-        model_columns["model_3"]
+        model_columns["model_4"]
     )
 
     missing_features = [
@@ -832,6 +1034,7 @@ def validate_output_dataset(
     ]
 
     if missing_features:
+
         fail(
             f"{year}: Missing output features:\n"
             + "\n".join(
@@ -850,6 +1053,22 @@ def validate_output_dataset(
 
     print(
         "Target:            VALID"
+    )
+
+    print(
+        f"Model 1 features:  {len(model_columns['model_1'])}"
+    )
+
+    print(
+        f"Model 2 features:  {len(model_columns['model_2'])}"
+    )
+
+    print(
+        f"Model 3 features:  {len(model_columns['model_3'])}"
+    )
+
+    print(
+        f"Model 4 features:  {len(model_columns['model_4'])}"
     )
 
     print(
@@ -879,6 +1098,7 @@ def process_year(year):
     )
 
     if not input_path.exists():
+
         fail(
             f"{year}: Input file does not exist:\n"
             f"{input_path}"
@@ -927,6 +1147,13 @@ def process_year(year):
         year=year,
     )
 
+    validate_required_columns(
+        df=df,
+        feature_definitions=MODEL_4_FEATURES,
+        model_name="MODEL 4",
+        year=year,
+    )
+
     # -------------------------------------------------------------------------
     # Create matchup features.
     # -------------------------------------------------------------------------
@@ -952,17 +1179,25 @@ def process_year(year):
         year=year,
     )
 
+    model_4 = create_feature_set(
+        df=df,
+        feature_definitions=MODEL_4_FEATURES,
+        model_name="MODEL 4",
+        year=year,
+    )
+
     matchup_features = pd.concat(
         [
             model_1,
             model_2,
             model_3,
+            model_4,
         ],
         axis=1,
     )
 
     # -------------------------------------------------------------------------
-    # Validate the generated features.
+    # Validate the generated feature sets.
     # -------------------------------------------------------------------------
 
     validate_feature_values(
@@ -986,25 +1221,39 @@ def process_year(year):
         year=year,
     )
 
+    validate_feature_values(
+        feature_df=model_4,
+        feature_definitions=MODEL_4_FEATURES,
+        model_name="MODEL 4",
+        year=year,
+    )
+
+    # -------------------------------------------------------------------------
+    # Validate all feature orientations.
+    # -------------------------------------------------------------------------
+
+    all_feature_definitions = {
+        **MODEL_1_FEATURES,
+        **MODEL_2_FEATURES,
+        **MODEL_3_FEATURES,
+        **MODEL_4_FEATURES,
+    }
+
     validate_orientation(
         source_df=df,
         matchup_df=matchup_features,
-        feature_definitions={
-            **MODEL_1_FEATURES,
-            **MODEL_2_FEATURES,
-            **MODEL_3_FEATURES,
-        },
+        feature_definitions=all_feature_definitions,
         year=year,
     )
+
+    # -------------------------------------------------------------------------
+    # Validate all feature missingness.
+    # -------------------------------------------------------------------------
 
     validate_missingness(
         source_df=df,
         matchup_df=matchup_features,
-        feature_definitions={
-            **MODEL_1_FEATURES,
-            **MODEL_2_FEATURES,
-            **MODEL_3_FEATURES,
-        },
+        feature_definitions=all_feature_definitions,
         year=year,
     )
 
@@ -1016,8 +1265,12 @@ def process_year(year):
         year=year
     )
 
+    # -------------------------------------------------------------------------
+    # Validate leakage across the complete Model 4 feature set.
+    # -------------------------------------------------------------------------
+
     validate_no_target_leakage(
-        feature_columns=model_columns["model_3"],
+        feature_columns=model_columns["model_4"],
         year=year,
     )
 
@@ -1032,6 +1285,10 @@ def process_year(year):
         model_columns=model_columns,
         year=year,
     )
+
+    # -------------------------------------------------------------------------
+    # Validate final output.
+    # -------------------------------------------------------------------------
 
     validate_output_dataset(
         output=output,
@@ -1068,6 +1325,9 @@ def process_year(year):
         "model_3_features": len(
             model_columns["model_3"]
         ),
+        "model_4_features": len(
+            model_columns["model_4"]
+        ),
     }
 
 
@@ -1102,21 +1362,67 @@ def main():
     print(
         "MODEL DESIGN"
     )
+
     print(
         "-------------"
     )
+
     print(
         f"Model 1: {len(MODEL_1_FEATURES)} compact baseline features"
     )
+
     print(
         f"Model 2: + {len(MODEL_2_FEATURES)} recent-form features"
     )
+
     print(
         f"Model 3: + {len(MODEL_3_FEATURES)} SOS features"
     )
+
     print(
-        f"Model 4: + {len(MODEL_4_FEATURES)} additional features (reserved)"
+        f"Model 4: + {len(MODEL_4_FEATURES)} additional football features"
     )
+
+    print()
+    print(
+        "TOTAL FEATURE COUNTS"
+    )
+
+    print(
+        "--------------------"
+    )
+
+    model_columns = create_model_columns()
+
+    print(
+        f"Model 1 total: {len(model_columns['model_1'])}"
+    )
+
+    print(
+        f"Model 2 total: {len(model_columns['model_2'])}"
+    )
+
+    print(
+        f"Model 3 total: {len(model_columns['model_3'])}"
+    )
+
+    print(
+        f"Model 4 total: {len(model_columns['model_4'])}"
+    )
+
+    print()
+    print(
+        "MODEL 4 ADDITIONS"
+    )
+
+    print(
+        "-----------------"
+    )
+
+    for feature in MODEL_4_FEATURES:
+        print(
+            f"  {feature}"
+        )
 
     OUTPUT_DIR.mkdir(
         parents=True,
@@ -1185,10 +1491,16 @@ def main():
         + len(MODEL_3_FEATURES)
     )
 
+    expected_model_4 = (
+        expected_model_3
+        + len(MODEL_4_FEATURES)
+    )
+
     if not (
         summary_df["model_1_features"]
         == expected_model_1
     ).all():
+
         fail(
             "Cross-season Model 1 feature count mismatch."
         )
@@ -1197,6 +1509,7 @@ def main():
         summary_df["model_2_features"]
         == expected_model_2
     ).all():
+
         fail(
             "Cross-season Model 2 feature count mismatch."
         )
@@ -1205,8 +1518,18 @@ def main():
         summary_df["model_3_features"]
         == expected_model_3
     ).all():
+
         fail(
             "Cross-season Model 3 feature count mismatch."
+        )
+
+    if not (
+        summary_df["model_4_features"]
+        == expected_model_4
+    ).all():
+
+        fail(
+            "Cross-season Model 4 feature count mismatch."
         )
 
     print(
@@ -1219,6 +1542,10 @@ def main():
 
     print(
         f"Model 3 feature count: {expected_model_3}"
+    )
+
+    print(
+        f"Model 4 feature count: {expected_model_4}"
     )
 
     print(

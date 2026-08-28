@@ -12,6 +12,16 @@ Model 2:
 Model 3:
     Model 2 + prior strength-of-schedule differences.
 
+Model 4:
+    Model 3 + additional matchup dimensions:
+        - Turnovers
+        - Third-down efficiency
+        - Sacks
+        - Completion percentage
+        - Total yards
+        - Possession time
+        - Penalty yards
+
 Temporal split
 --------------
 Training:
@@ -24,6 +34,27 @@ Test:
     2025
 
 The test season is used only once for final evaluation.
+
+Input
+-----
+data/processed/logistic_matchup_features/
+    logistic_matchup_features_{year}.csv
+
+Output
+------
+data/processed/models/compact_logistic/
+    models/
+    predictions/
+    compact_logistic_comparison.csv
+
+Notes
+-----
+The matchup feature construction is performed upstream by:
+
+    create_logistic_matchup_features.py
+
+This script therefore does NOT reconstruct the matchup differences.
+It consumes the already validated compact feature datasets directly.
 """
 
 from pathlib import Path
@@ -60,11 +91,17 @@ TEST_YEARS = [2025]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
+# --------------------------------------------------------------------------
+# IMPORTANT:
+# Use the validated compact matchup datasets rather than the enhanced
+# 448-column datasets.
+# --------------------------------------------------------------------------
+
 INPUT_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "logistic_enhanced_features"
+    / "logistic_matchup_features"
 )
 
 OUTPUT_DIR = (
@@ -76,127 +113,135 @@ OUTPUT_DIR = (
 )
 
 MODEL_DIR = OUTPUT_DIR / "models"
+
 PREDICTION_DIR = OUTPUT_DIR / "predictions"
 
-SUMMARY_PATH = OUTPUT_DIR / "compact_logistic_comparison.csv"
+SUMMARY_PATH = (
+    OUTPUT_DIR
+    / "compact_logistic_comparison.csv"
+)
 
 
 # ============================================================================
 # FEATURE DEFINITIONS
 # ============================================================================
 
-MODEL_1_FEATURES = {
-    "winPctDiff": (
-        "winPctBefore_home",
-        "winPctBefore_away",
-        1,
-    ),
+# --------------------------------------------------------------------------
+# MODEL 1 — COMPACT BASELINE
+# --------------------------------------------------------------------------
 
-    "pointDifferentialAvgDiff": (
-        "pointDifferentialAvgBefore_home",
-        "pointDifferentialAvgBefore_away",
-        1,
-    ),
-
-    "pointsForAvgDiff": (
-        "pointsForAvgBefore_home",
-        "pointsForAvgBefore_away",
-        1,
-    ),
-
-    "pointsAgainstAvgDiff": (
-        "pointsAgainstAvgBefore_home",
-        "pointsAgainstAvgBefore_away",
-        -1,
-    ),
-
-    "yardsPerPassAttemptDiff": (
-        "yardsPerPassAttemptBefore_home",
-        "yardsPerPassAttemptBefore_away",
-        1,
-    ),
-
-    "yardsPerRushAttemptDiff": (
-        "yardsPerRushAttemptBefore_home",
-        "yardsPerRushAttemptBefore_away",
-        1,
-    ),
-}
+MODEL_1_FEATURES = [
+    "winPctDiff",
+    "pointDifferentialAvgDiff",
+    "pointsForAvgDiff",
+    "pointsAgainstAvgDiff",
+    "yardsPerPassAttemptDiff",
+    "yardsPerRushAttemptDiff",
+]
 
 
-MODEL_2_FEATURES = {
-    "pointsForTrendDiff": (
-        "pointsForTrend_home",
-        "pointsForTrend_away",
-        1,
-    ),
+# --------------------------------------------------------------------------
+# MODEL 2 — ADD RECENT FORM
+# --------------------------------------------------------------------------
 
-    "pointsAgainstTrendDiff": (
-        "pointsAgainstTrend_home",
-        "pointsAgainstTrend_away",
-        -1,
-    ),
-
-    "pointDifferentialTrendDiff": (
-        "pointDifferentialTrend_home",
-        "pointDifferentialTrend_away",
-        1,
-    ),
-
-    "totalYardsTrendDiff": (
-        "totalYardsTrend_home",
-        "totalYardsTrend_away",
-        1,
-    ),
-
-    "netPassingYardsTrendDiff": (
-        "netPassingYardsTrend_home",
-        "netPassingYardsTrend_away",
-        1,
-    ),
-
-    "winPctTrendDiff": (
-        "winPctTrend_home",
-        "winPctTrend_away",
-        1,
-    ),
-}
+MODEL_2_FEATURES = [
+    "pointsForTrendDiff",
+    "pointsAgainstTrendDiff",
+    "pointDifferentialTrendDiff",
+    "totalYardsTrendDiff",
+    "netPassingYardsTrendDiff",
+    "winPctTrendDiff",
+]
 
 
-MODEL_3_FEATURES = {
-    "priorSOSWinPctDiff": (
-        "priorSOSWinPct_home",
-        "priorSOSWinPct_away",
-        1,
-    ),
+# --------------------------------------------------------------------------
+# MODEL 3 — ADD PRIOR STRENGTH OF SCHEDULE
+# --------------------------------------------------------------------------
 
-    "priorSOSPointDiffDiff": (
-        "priorSOSPointDiff_home",
-        "priorSOSPointDiff_away",
-        1,
-    ),
-}
+MODEL_3_FEATURES = [
+    "priorSOSWinPctDiff",
+    "priorSOSPointDiffDiff",
+]
+
+
+# --------------------------------------------------------------------------
+# MODEL 4 — ADD ADDITIONAL GAME-STYLE / EFFICIENCY FEATURES
+# --------------------------------------------------------------------------
+#
+# These features were selected specifically to add dimensions that are not
+# already represented strongly by Models 1-3.
+#
+# Turnovers:
+#     Ball security / turnover differential.
+#
+# Third down:
+#     Sustaining drives and offensive efficiency.
+#
+# Sacks:
+#     Pass rush / protection dimension.
+#
+# Completion percentage:
+#     Passing efficiency distinct from yards per attempt.
+#
+# Total yards:
+#     Overall offensive production.
+#
+# Possession seconds:
+#     Offensive tempo / drive sustainability / ability to control possession.
+#
+# Penalty yards:
+#     Discipline / hidden-yardage component.
+# --------------------------------------------------------------------------
+
+MODEL_4_FEATURES = [
+    "turnoversAvgDiff",
+    "thirdDownPctDiff",
+    "sacksAvgDiff",
+    "completionPctDiff",
+    "totalYardsAvgDiff",
+    "possessionSecondsAvgDiff",
+    "penaltyYardsAvgDiff",
+]
 
 
 # ============================================================================
-# MODEL DEFINITIONS
+# NESTED MODEL DEFINITIONS
 # ============================================================================
 
 MODEL_FEATURES = {
-    "Model 1": {
-        **MODEL_1_FEATURES,
-    },
+    "Model 1": (
+        MODEL_1_FEATURES
+    ),
 
-    "Model 2": {
-        **MODEL_1_FEATURES,
-        **MODEL_2_FEATURES,
-    },
+    "Model 2": (
+        MODEL_1_FEATURES
+        + MODEL_2_FEATURES
+    ),
 
-    "Model 3": {
-        **MODEL_1_FEATURES,
-        **MODEL_2_FEATURES,
-        **MODEL_3_FEATURES,
-    },
+    "Model 3": (
+        MODEL_1_FEATURES
+        + MODEL_2_FEATURES
+        + MODEL_3_FEATURES
+    ),
+
+    "Model 4": (
+        MODEL_1_FEATURES
+        + MODEL_2_FEATURES
+        + MODEL_3_FEATURES
+        + MODEL_4_FEATURES
+    ),
+}
+
+
+# ============================================================================
+# EXPECTED FEATURE COUNTS
+# ============================================================================
+
+EXPECTED_FEATURE_COUNTS = {
+    "Model 1": 6,
+    "Model 2": 12,
+    "Model 3": 14,
+    "Model 4": 21,
 }
 
 
@@ -205,6 +250,8 @@ MODEL_FEATURES = {
 # ============================================================================
 
 def print_section(title):
+    """Print a standardized section header."""
+
     print()
     print("=" * 78)
     print(title)
@@ -212,7 +259,11 @@ def print_section(title):
 
 
 def fail(message):
-    raise ValueError(f"\nVALIDATION FAILED:\n{message}")
+    """Raise a validation error with a clear message."""
+
+    raise ValueError(
+        f"\nVALIDATION FAILED:\n{message}"
+    )
 
 
 # ============================================================================
@@ -221,23 +272,36 @@ def fail(message):
 
 def load_season(year):
     """
-    Load one enhanced feature dataset.
+    Load one validated compact matchup feature dataset.
     """
 
-    path = INPUT_DIR / f"logistic_features_{year}.csv"
+    path = (
+        INPUT_DIR
+        / f"logistic_matchup_features_{year}.csv"
+    )
 
     if not path.exists():
+
         fail(
-            f"Missing enhanced feature file for {year}:\n"
+            f"Missing matchup feature file for {year}:\n"
             f"{path}"
         )
 
-    df = pd.read_csv(path)
+    df = pd.read_csv(
+        path
+    )
+
+    if df.empty:
+
+        fail(
+            f"{year}: Input dataset is empty."
+        )
 
     if TARGET_COLUMN not in df.columns:
+
         fail(
-            f"{year}: target column '{TARGET_COLUMN}' "
-            f"is missing."
+            f"{year}: Target column "
+            f"'{TARGET_COLUMN}' is missing."
         )
 
     return df
@@ -248,7 +312,9 @@ def load_all_data():
     Load all seasons and combine them into one dataframe.
     """
 
-    print_section("LOADING ENHANCED FEATURE DATA")
+    print_section(
+        "LOADING COMPACT MATCHUP FEATURE DATA"
+    )
 
     years = (
         TRAIN_YEARS
@@ -260,11 +326,18 @@ def load_all_data():
 
     for year in years:
 
-        df = load_season(year)
+        df = load_season(
+            year
+        )
+
+        # Avoid repeated DataFrame.insert operations.
+        df = df.copy()
 
         df["model_year"] = year
 
-        frames.append(df)
+        frames.append(
+            df
+        )
 
         print(
             f"{year}: "
@@ -288,108 +361,386 @@ def load_all_data():
 
 
 # ============================================================================
-# FEATURE CONSTRUCTION
-# ============================================================================
-
-def construct_compact_features(
-    data,
-    feature_definition,
-):
-    """
-    Construct home-minus-away matchup features.
-
-    The third element of each definition tuple determines the sign:
-
-        +1:
-            home - away
-
-        -1:
-            away - home
-
-    This guarantees that a positive feature value consistently means
-    "better for the home team."
-    """
-
-    result = pd.DataFrame(
-        index=data.index
-    )
-
-    for feature_name, definition in feature_definition.items():
-
-        home_column = definition[0]
-        away_column = definition[1]
-        direction = definition[2]
-
-        if home_column not in data.columns:
-            fail(
-                f"Missing source feature: "
-                f"{home_column}"
-            )
-
-        if away_column not in data.columns:
-            fail(
-                f"Missing source feature: "
-                f"{away_column}"
-            )
-
-        home = pd.to_numeric(
-            data[home_column],
-            errors="coerce",
-        )
-
-        away = pd.to_numeric(
-            data[away_column],
-            errors="coerce",
-        )
-
-        difference = (
-            home - away
-        )
-
-        result[feature_name] = (
-            difference * direction
-        )
-
-    return result
-
-
-# ============================================================================
 # FEATURE VALIDATION
 # ============================================================================
 
-def validate_feature_sets(data):
+def validate_model_feature_definitions(
+    data
+):
     """
-    Confirm all source columns required by Models 1-3 exist.
+    Validate that every expected compact feature exists and that the
+    nested Model 1 -> Model 4 structure is correct.
     """
 
-    print_section("VALIDATING MODEL FEATURE DEFINITIONS")
+    print_section(
+        "VALIDATING MODEL FEATURE DEFINITIONS"
+    )
 
-    for model_name, feature_definition in MODEL_FEATURES.items():
+    previous_features = set()
 
-        constructed = construct_compact_features(
-            data,
-            feature_definition,
-        )
+    for model_name, features in MODEL_FEATURES.items():
 
-        expected_count = len(
-            feature_definition
+        expected_count = (
+            EXPECTED_FEATURE_COUNTS[
+                model_name
+            ]
         )
 
         actual_count = len(
-            constructed.columns
+            features
         )
 
+        # --------------------------------------------------------------
+        # Count validation
+        # --------------------------------------------------------------
+
         if actual_count != expected_count:
+
             fail(
                 f"{model_name}: expected "
-                f"{expected_count} features but constructed "
-                f"{actual_count}."
+                f"{expected_count} features but "
+                f"definition contains {actual_count}."
             )
+
+        # --------------------------------------------------------------
+        # Duplicate validation
+        # --------------------------------------------------------------
+
+        if len(features) != len(set(features)):
+
+            duplicates = sorted(
+                {
+                    feature
+                    for feature in features
+                    if features.count(feature) > 1
+                }
+            )
+
+            fail(
+                f"{model_name}: duplicate features detected: "
+                f"{duplicates}"
+            )
+
+        # --------------------------------------------------------------
+        # Source dataset validation
+        # --------------------------------------------------------------
+
+        missing = [
+            feature
+            for feature in features
+            if feature not in data.columns
+        ]
+
+        if missing:
+
+            fail(
+                f"{model_name}: missing required matchup features:\n"
+                + "\n".join(
+                    f"  - {feature}"
+                    for feature in missing
+                )
+            )
+
+        # --------------------------------------------------------------
+        # Nesting validation
+        # --------------------------------------------------------------
+
+        current_features = set(
+            features
+        )
+
+        if previous_features:
+
+            if not previous_features.issubset(
+                current_features
+            ):
+
+                missing_from_current = sorted(
+                    previous_features
+                    - current_features
+                )
+
+                fail(
+                    f"{model_name}: previous model features "
+                    "are not fully contained in this model:\n"
+                    + "\n".join(
+                        f"  - {feature}"
+                        for feature in missing_from_current
+                    )
+                )
+
+        previous_features = current_features
 
         print(
             f"{model_name}: "
             f"{actual_count} features — VALID"
         )
+
+    # ------------------------------------------------------------------
+    # Explicit Model 4 extension validation.
+    # ------------------------------------------------------------------
+
+    model_3 = set(
+        MODEL_FEATURES["Model 3"]
+    )
+
+    model_4 = set(
+        MODEL_FEATURES["Model 4"]
+    )
+
+    model_4_additions = sorted(
+        model_4 - model_3
+    )
+
+    expected_model_4_additions = set(
+        MODEL_4_FEATURES
+    )
+
+    if (
+        set(model_4_additions)
+        != expected_model_4_additions
+    ):
+
+        fail(
+            "Model 4 additions do not match the expected seven features."
+        )
+
+    print()
+    print(
+        "Model 4 additions:"
+    )
+
+    for feature in MODEL_4_FEATURES:
+        print(
+            f"  {feature}"
+        )
+
+    print(
+        "Model nesting: VALID"
+    )
+
+
+# ============================================================================
+# TARGET VALIDATION
+# ============================================================================
+
+def validate_target(data):
+    """
+    Validate the binary home-win target.
+    """
+
+    print_section(
+        "VALIDATING TARGET"
+    )
+
+    if data[
+        TARGET_COLUMN
+    ].isna().any():
+
+        fail(
+            "Target contains missing values."
+        )
+
+    unique_target = sorted(
+        data[
+            TARGET_COLUMN
+        ].unique()
+    )
+
+    if unique_target != [0, 1]:
+
+        fail(
+            f"Unexpected target values: "
+            f"{unique_target}"
+        )
+
+    print(
+        f"Target: {TARGET_COLUMN}"
+    )
+
+    print(
+        f"Unique values: {unique_target}"
+    )
+
+    print(
+        f"Home wins: "
+        f"{int(data[TARGET_COLUMN].sum()):,}"
+    )
+
+    print(
+        f"Away wins: "
+        f"{int((data[TARGET_COLUMN] == 0).sum()):,}"
+    )
+
+    print(
+        "Target validation: VALID"
+    )
+
+
+# ============================================================================
+# IDENTIFIER / DATASET VALIDATION
+# ============================================================================
+
+def validate_dataset_integrity(data):
+    """
+    Validate basic integrity of the combined matchup datasets.
+    """
+
+    print_section(
+        "VALIDATING DATASET INTEGRITY"
+    )
+
+    if "season" not in data.columns:
+
+        fail(
+            "Combined data is missing 'season'."
+        )
+
+    if "model_year" not in data.columns:
+
+        fail(
+            "Combined data is missing 'model_year'."
+        )
+
+    # --------------------------------------------------------------
+    # Check model year consistency.
+    # --------------------------------------------------------------
+
+    mismatched_years = (
+        data["season"]
+        != data["model_year"]
+    )
+
+    if mismatched_years.any():
+
+        count = int(
+            mismatched_years.sum()
+        )
+
+        fail(
+            f"Found {count:,} rows where "
+            "'season' does not match 'model_year'."
+        )
+
+    # --------------------------------------------------------------
+    # Game ID validation if available.
+    # --------------------------------------------------------------
+
+    game_id_candidates = [
+        "id",
+        "gameId",
+        "game_id",
+    ]
+
+    game_id = None
+
+    for candidate in game_id_candidates:
+
+        if candidate in data.columns:
+
+            game_id = candidate
+            break
+
+    if game_id is not None:
+
+        if data[game_id].isna().any():
+
+            fail(
+                f"Game ID column '{game_id}' "
+                "contains missing values."
+            )
+
+        duplicate_count = int(
+            data[game_id].duplicated().sum()
+        )
+
+        if duplicate_count:
+
+            fail(
+                f"Found {duplicate_count:,} duplicate "
+                f"game IDs in combined data."
+            )
+
+        print(
+            f"Game ID column: {game_id}"
+        )
+
+        print(
+            "Game ID uniqueness: VALID"
+        )
+
+    else:
+
+        print(
+            "Game ID column: not present "
+            "(not required for model training)"
+        )
+
+    print(
+        "Dataset integrity: VALID"
+    )
+
+
+# ============================================================================
+# FEATURE NUMERIC VALIDATION
+# ============================================================================
+
+def validate_feature_types(data):
+    """
+    Confirm all compact matchup features are numeric.
+    """
+
+    print_section(
+        "VALIDATING FEATURE TYPES"
+    )
+
+    all_features = []
+
+    for features in MODEL_FEATURES.values():
+
+        all_features.extend(
+            features
+        )
+
+    all_features = list(
+        dict.fromkeys(all_features)
+    )
+
+    for feature in all_features:
+
+        if not pd.api.types.is_numeric_dtype(
+            data[feature]
+        ):
+
+            fail(
+                f"Feature '{feature}' is not numeric."
+            )
+
+        numeric_values = pd.to_numeric(
+            data[feature],
+            errors="coerce",
+        )
+
+        finite_values = numeric_values[
+            numeric_values.notna()
+        ]
+
+        if not np.isfinite(
+            finite_values.to_numpy()
+        ).all():
+
+            fail(
+                f"Feature '{feature}' contains "
+                "infinite values."
+            )
+
+    print(
+        f"Validated features: {len(all_features)}"
+    )
+
+    print(
+        "Numeric / finite validation: VALID"
+    )
 
 
 # ============================================================================
@@ -401,18 +752,26 @@ def split_data(data):
     Create the fixed temporal train/validation/test split.
     """
 
-    print_section("TEMPORAL SPLIT")
+    print_section(
+        "TEMPORAL SPLIT"
+    )
 
     train = data[
-        data["model_year"].isin(TRAIN_YEARS)
+        data["model_year"].isin(
+            TRAIN_YEARS
+        )
     ].copy()
 
     validation = data[
-        data["model_year"].isin(VALIDATION_YEARS)
+        data["model_year"].isin(
+            VALIDATION_YEARS
+        )
     ].copy()
 
     test = data[
-        data["model_year"].isin(TEST_YEARS)
+        data["model_year"].isin(
+            TEST_YEARS
+        )
     ].copy()
 
     print(
@@ -445,15 +804,32 @@ def split_data(data):
     )
 
     if train.empty:
-        fail("Training dataset is empty.")
+
+        fail(
+            "Training dataset is empty."
+        )
 
     if validation.empty:
-        fail("Validation dataset is empty.")
+
+        fail(
+            "Validation dataset is empty."
+        )
 
     if test.empty:
-        fail("Test dataset is empty.")
 
-    return train, validation, test
+        fail(
+            "Test dataset is empty."
+        )
+
+    print(
+        "Temporal split: VALID"
+    )
+
+    return (
+        train,
+        validation,
+        test,
+    )
 
 
 # ============================================================================
@@ -570,11 +946,11 @@ def extract_coefficients(
     feature_names,
 ):
     """
-    Extract logistic regression coefficients after preprocessing.
+    Extract logistic regression coefficients.
 
-    Because all compact features are standardized, coefficients represent
-    the change in log-odds associated with a one-standard-deviation increase
-    in the matchup feature.
+    Features are standardized, so coefficients represent the change in
+    log-odds associated with a one-standard-deviation increase in the
+    matchup feature.
     """
 
     model = pipeline.named_steps[
@@ -595,16 +971,20 @@ def extract_coefficients(
         rows.append(
             {
                 "feature": feature,
-                "coefficient_per_1sd": float(
-                    coefficient
-                ),
-                "odds_ratio_per_1sd": float(
-                    np.exp(coefficient)
-                ),
+
+                "coefficient_per_1sd":
+                    float(coefficient),
+
+                "odds_ratio_per_1sd":
+                    float(
+                        np.exp(coefficient)
+                    ),
             }
         )
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows
+    )
 
 
 # ============================================================================
@@ -613,21 +993,17 @@ def extract_coefficients(
 
 def train_model(
     model_name,
-    feature_definition,
+    feature_names,
     train,
     validation,
     test,
 ):
     """
-    Train one compact logistic model and evaluate it on validation and test.
+    Train one compact logistic model and evaluate it.
     """
 
     print_section(
         f"TRAINING {model_name.upper()}"
-    )
-
-    feature_names = list(
-        feature_definition.keys()
     )
 
     print(
@@ -639,26 +1015,53 @@ def train_model(
     )
 
     for feature in feature_names:
-        print(f"  {feature}")
 
-    # ----------------------------------------------------------------------
-    # Construct matchup features
-    # ----------------------------------------------------------------------
+        print(
+            f"  {feature}"
+        )
 
-    X_train = construct_compact_features(
-        train,
-        feature_definition,
-    )
+    # ------------------------------------------------------------------
+    # Verify features exist in each split.
+    # ------------------------------------------------------------------
 
-    X_validation = construct_compact_features(
-        validation,
-        feature_definition,
-    )
+    for split_name, df in [
+        ("training", train),
+        ("validation", validation),
+        ("test", test),
+    ]:
 
-    X_test = construct_compact_features(
-        test,
-        feature_definition,
-    )
+        missing = [
+            feature
+            for feature in feature_names
+            if feature not in df.columns
+        ]
+
+        if missing:
+
+            fail(
+                f"{model_name}: missing features in "
+                f"{split_name} dataset:\n"
+                + "\n".join(
+                    f"  - {feature}"
+                    for feature in missing
+                )
+            )
+
+    # ------------------------------------------------------------------
+    # Feature matrices
+    # ------------------------------------------------------------------
+
+    X_train = train[
+        feature_names
+    ].copy()
+
+    X_validation = validation[
+        feature_names
+    ].copy()
+
+    X_test = test[
+        feature_names
+    ].copy()
 
     y_train = train[
         TARGET_COLUMN
@@ -672,12 +1075,11 @@ def train_model(
         TARGET_COLUMN
     ].astype(int)
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Missingness diagnostics
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     print()
-
     print(
         "Training missingness:"
     )
@@ -696,9 +1098,9 @@ def train_model(
             f"{pct:7.3f}%"
         )
 
-    # ----------------------------------------------------------------------
-    # Build and fit model
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Build and fit
+    # ------------------------------------------------------------------
 
     pipeline = build_pipeline(
         feature_names
@@ -709,29 +1111,28 @@ def train_model(
         y_train,
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Predictions
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
-    train_probability = pipeline.predict_proba(
-        X_train
-    )[:, 1]
+    train_probability = (
+        pipeline
+        .predict_proba(X_train)[:, 1]
+    )
 
     validation_probability = (
-        pipeline.predict_proba(
-            X_validation
-        )[:, 1]
+        pipeline
+        .predict_proba(X_validation)[:, 1]
     )
 
     test_probability = (
-        pipeline.predict_proba(
-            X_test
-        )[:, 1]
+        pipeline
+        .predict_proba(X_test)[:, 1]
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Metrics
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     train_metrics = calculate_metrics(
         y_train,
@@ -774,20 +1175,30 @@ def train_model(
         metrics_table.to_string(
             index=False,
             formatters={
-                "auc": "{:.4f}".format,
-                "log_loss": "{:.4f}".format,
-                "brier_score": "{:.4f}".format,
-                "accuracy": "{:.4f}".format,
-                "home_win_rate": "{:.4f}".format,
+                "auc":
+                    "{:.4f}".format,
+
+                "log_loss":
+                    "{:.4f}".format,
+
+                "brier_score":
+                    "{:.4f}".format,
+
+                "accuracy":
+                    "{:.4f}".format,
+
+                "home_win_rate":
+                    "{:.4f}".format,
+
                 "mean_predicted_home_win_prob":
                     "{:.4f}".format,
             },
         )
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Coefficients
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     coefficients = extract_coefficients(
         pipeline,
@@ -805,24 +1216,32 @@ def train_model(
             formatters={
                 "coefficient_per_1sd":
                     "{:.4f}".format,
+
                 "odds_ratio_per_1sd":
                     "{:.4f}".format,
             },
         )
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Save model
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     MODEL_DIR.mkdir(
         parents=True,
         exist_ok=True,
     )
 
+    model_filename = (
+        model_name
+        .lower()
+        .replace(" ", "_")
+        + ".joblib"
+    )
+
     model_path = (
         MODEL_DIR
-        / f"{model_name.lower().replace(' ', '_')}.joblib"
+        / model_filename
     )
 
     joblib.dump(
@@ -835,9 +1254,9 @@ def train_model(
         f"Saved model: {model_path}"
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Save predictions
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     PREDICTION_DIR.mkdir(
         parents=True,
@@ -870,18 +1289,45 @@ def train_model(
 
         output = pd.DataFrame(
             {
-                "model": model_name,
-                "dataset": split_name,
-                "season": df["model_year"].values,
-                "actual_win_home": df[
-                    TARGET_COLUMN
-                ].values,
+                "model":
+                    model_name,
+
+                "dataset":
+                    split_name,
+
+                "season":
+                    df["model_year"].values,
+
+                "actual_win_home":
+                    df[
+                        TARGET_COLUMN
+                    ].values,
+
                 "predicted_home_win_probability":
                     probability,
+
                 "predicted_win_home":
                     prediction,
             }
         )
+
+        # Preserve game ID when available.
+
+        for game_id_column in [
+            "id",
+            "gameId",
+            "game_id",
+        ]:
+
+            if game_id_column in df.columns:
+
+                output[
+                    game_id_column
+                ] = df[
+                    game_id_column
+                ].values
+
+                break
 
         prediction_rows.append(
             output
@@ -892,9 +1338,16 @@ def train_model(
         ignore_index=True,
     )
 
+    prediction_filename = (
+        model_name
+        .lower()
+        .replace(" ", "_")
+        + "_predictions.csv"
+    )
+
     prediction_path = (
         PREDICTION_DIR
-        / f"{model_name.lower().replace(' ', '_')}_predictions.csv"
+        / prediction_filename
     )
 
     predictions.to_csv(
@@ -907,46 +1360,67 @@ def train_model(
         f"{prediction_path}"
     )
 
-    # ----------------------------------------------------------------------
-    # Summary record
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Summary
+    # ------------------------------------------------------------------
 
     summary = {
-        "model": model_name,
-        "feature_count": len(feature_names),
+        "model":
+            model_name,
 
-        "train_rows": len(train),
-        "validation_rows": len(validation),
-        "test_rows": len(test),
+        "feature_count":
+            len(feature_names),
 
-        "train_auc": train_metrics["auc"],
+        "train_rows":
+            len(train),
+
+        "validation_rows":
+            len(validation),
+
+        "test_rows":
+            len(test),
+
+        "train_auc":
+            train_metrics["auc"],
+
         "validation_auc":
             validation_metrics["auc"],
-        "test_auc": test_metrics["auc"],
+
+        "test_auc":
+            test_metrics["auc"],
 
         "train_log_loss":
             train_metrics["log_loss"],
+
         "validation_log_loss":
             validation_metrics["log_loss"],
+
         "test_log_loss":
             test_metrics["log_loss"],
 
         "train_brier_score":
             train_metrics["brier_score"],
+
         "validation_brier_score":
             validation_metrics["brier_score"],
+
         "test_brier_score":
             test_metrics["brier_score"],
 
         "train_accuracy":
             train_metrics["accuracy"],
+
         "validation_accuracy":
             validation_metrics["accuracy"],
+
         "test_accuracy":
             test_metrics["accuracy"],
     }
 
-    return summary, coefficients
+    return (
+        summary,
+        coefficients,
+    )
 
 
 # ============================================================================
@@ -976,92 +1450,98 @@ def main():
         f"Output directory:  {OUTPUT_DIR}"
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Model design
+    # ------------------------------------------------------------------
+
+    print()
+    print(
+        "MODEL DESIGN"
+    )
+    print(
+        "------------"
+    )
+
+    for model_name, features in (
+        MODEL_FEATURES.items()
+    ):
+
+        print(
+            f"{model_name}: "
+            f"{len(features)} features"
+        )
+
+    print()
+    print(
+        "Model 4 additions:"
+    )
+
+    for feature in MODEL_4_FEATURES:
+
+        print(
+            f"  + {feature}"
+        )
+
+    # ------------------------------------------------------------------
     # Load
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     data = load_all_data()
 
-    # ----------------------------------------------------------------------
-    # Validate feature definitions
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Validate dataset
+    # ------------------------------------------------------------------
 
-    validate_feature_sets(
+    validate_dataset_integrity(
         data
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Validate features
+    # ------------------------------------------------------------------
+
+    validate_model_feature_definitions(
+        data
+    )
+
+    validate_feature_types(
+        data
+    )
+
+    # ------------------------------------------------------------------
     # Validate target
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
-    print_section(
-        "VALIDATING TARGET"
+    validate_target(
+        data
     )
 
-    if data[
-        TARGET_COLUMN
-    ].isna().any():
-
-        fail(
-            "Target contains missing values."
-        )
-
-    unique_target = sorted(
-        data[
-            TARGET_COLUMN
-        ].unique()
-    )
-
-    if unique_target != [0, 1]:
-
-        fail(
-            f"Unexpected target values: "
-            f"{unique_target}"
-        )
-
-    print(
-        f"Target: {TARGET_COLUMN}"
-    )
-
-    print(
-        f"Unique values: {unique_target}"
-    )
-
-    print(
-        f"Home wins: "
-        f"{int(data[TARGET_COLUMN].sum()):,}"
-    )
-
-    print(
-        f"Away wins: "
-        f"{int((data[TARGET_COLUMN] == 0).sum()):,}"
-    )
-
-    # ----------------------------------------------------------------------
-    # Split
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Temporal split
+    # ------------------------------------------------------------------
 
     train, validation, test = split_data(
         data
     )
 
-    # ----------------------------------------------------------------------
-    # Train Models 1-3
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Train Models 1-4
+    # ------------------------------------------------------------------
 
     summaries = []
+
     coefficient_results = {}
 
-    for model_name, feature_definition in (
+    for model_name, feature_names in (
         MODEL_FEATURES.items()
     ):
 
         summary, coefficients = train_model(
-            model_name,
-            feature_definition,
-            train,
-            validation,
-            test,
+            model_name=model_name,
+            feature_names=feature_names,
+            train=train,
+            validation=validation,
+            test=test,
         )
 
         summaries.append(
@@ -1072,9 +1552,9 @@ def main():
             model_name
         ] = coefficients
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Comparison
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     print_section(
         "MODEL COMPARISON"
@@ -1093,8 +1573,11 @@ def main():
         comparison.to_string(
             index=False,
             formatters={
-                column: "{:.4f}".format
+                column:
+                    "{:.4f}".format
+
                 for column in comparison.columns
+
                 if column not in [
                     "model",
                     "feature_count",
@@ -1106,9 +1589,9 @@ def main():
         )
     )
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Save comparison
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     OUTPUT_DIR.mkdir(
         parents=True,
@@ -1126,9 +1609,9 @@ def main():
         f"{SUMMARY_PATH}"
     )
 
-    # ----------------------------------------------------------------------
-    # Validation-based recommendation
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Validation-based ranking
+    # ------------------------------------------------------------------
 
     best_model = (
         comparison
@@ -1159,6 +1642,81 @@ def main():
     )
 
     print()
+
+    # ------------------------------------------------------------------
+    # Explicit Model 3 vs Model 4 comparison
+    # ------------------------------------------------------------------
+
+    model_3 = comparison[
+        comparison["model"] == "Model 3"
+    ].iloc[0]
+
+    model_4 = comparison[
+        comparison["model"] == "Model 4"
+    ].iloc[0]
+
+    validation_log_loss_change = (
+        model_4["validation_log_loss"]
+        - model_3["validation_log_loss"]
+    )
+
+    validation_auc_change = (
+        model_4["validation_auc"]
+        - model_3["validation_auc"]
+    )
+
+    validation_brier_change = (
+        model_4["validation_brier_score"]
+        - model_3["validation_brier_score"]
+    )
+
+    print(
+        "MODEL 3 → MODEL 4 VALIDATION CHANGE"
+    )
+
+    print(
+        f"Validation log loss change: "
+        f"{validation_log_loss_change:+.4f}"
+    )
+
+    print(
+        f"Validation AUC change:      "
+        f"{validation_auc_change:+.4f}"
+    )
+
+    print(
+        f"Validation Brier change:    "
+        f"{validation_brier_change:+.4f}"
+    )
+
+    print()
+
+    if validation_log_loss_change < 0:
+
+        print(
+            "Model 4 improves validation log loss "
+            "relative to Model 3."
+        )
+
+    elif validation_log_loss_change > 0:
+
+        print(
+            "Model 4 worsens validation log loss "
+            "relative to Model 3."
+        )
+
+    else:
+
+        print(
+            "Model 4 has identical validation log loss "
+            "to Model 3."
+        )
+
+    # ------------------------------------------------------------------
+    # Test-set warning
+    # ------------------------------------------------------------------
+
+    print()
     print(
         "IMPORTANT:"
     )
@@ -1169,9 +1727,18 @@ def main():
     )
 
     print(
-        "The test results should not be used to "
-        "select between Models 1-3."
+        "The test results should NOT be used to "
+        "select between Models 1-4."
     )
+
+    print(
+        "Model selection should be based on the "
+        "2023-2024 validation results."
+    )
+
+    # ------------------------------------------------------------------
+    # Completion
+    # ------------------------------------------------------------------
 
     print()
     print_section(
