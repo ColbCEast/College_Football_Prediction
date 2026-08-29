@@ -1,0 +1,6 @@
+audit,status,details
+coefficient_sign_stability,REVIEW,19 features show both positive and negative coefficients across seasons.
+bootstrap_coefficient_stability,REVIEW,18 Model 4 coefficient 95% bootstrap intervals cross zero.
+feature_correlation,REVIEW,3 feature pairs have absolute correlation >= 0.80.
+feature_missingness,REVIEW,Maximum observed seasonal missingness: 100.00%.
+model_3_to_model_4_validation,PASS,Validation log loss changed from 0.5780 to 0.5760.
