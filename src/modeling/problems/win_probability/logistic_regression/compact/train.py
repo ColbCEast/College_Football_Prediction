@@ -101,15 +101,18 @@ INPUT_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "logistic_matchup_features"
+    / "features"
+    / "win_probability"
+    / "logistic_regression"
+    / "matchup"
 )
 
 OUTPUT_DIR = (
     PROJECT_ROOT
-    / "data"
-    / "processed"
     / "models"
-    / "compact_logistic"
+    / "win_probability"
+    / "logistic_regression"
+    / "compact"
 )
 
 MODEL_DIR = OUTPUT_DIR / "models"

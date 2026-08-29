@@ -5,8 +5,8 @@ import pandas as pd
 # PATHS
 # ============================================================
 
-ADVANCED_STATS_PATH = "data/processed/features/features_{}.csv"
-GAME_FEATURES_PATH = "data/processed/game_features/game_features_{}.csv"
+ADVANCED_STATS_PATH = "data/processed/features/base/features_{}.csv"
+GAME_FEATURES_PATH = "data/processed/features/game_level/game_features_{}.csv"
 GAMES_PATH = "data/raw/games/games_{}.csv"
 
 

@@ -37,13 +37,16 @@ from sklearn.preprocessing import StandardScaler
 # CONFIGURATION
 # =============================================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[6]
 
 INPUT_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "logistic_enhanced_features"
+    / "features"
+    / "win_probability"
+    / "logistic_regression"
+    / "enhanced"
 )
 
 YEARS = list(range(2015, 2026))

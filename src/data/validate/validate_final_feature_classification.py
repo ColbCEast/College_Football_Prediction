@@ -11,7 +11,7 @@ CLASSIFICATION_PATH = (
 )
 
 FINAL_FEATURE_PATH = (
-    "data/processed/final_features/"
+    "data/processed/features/final/"
 )
 
 

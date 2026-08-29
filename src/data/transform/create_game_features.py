@@ -192,7 +192,7 @@ def clean_game_features(game_features):
 if __name__ == "__main__":
     for year in range(2015, 2026):
         path = (
-            f"data/processed/game_team_stats/game_team_stats_{year}.csv"
+            f"data/processed/game_stats/team_level/game_team_stats_{year}.csv"
         )
 
         team_stats = load_team_stats(path)
@@ -213,4 +213,4 @@ if __name__ == "__main__":
         print("\nCleaned game-level shape:")
         print(game_features.shape)
 
-        game_features.to_csv(f"data/processed/game_features/game_features_{year}.csv", index = False)
+        game_features.to_csv(f"data/processed/features/game_level/game_features_{year}.csv", index = False)

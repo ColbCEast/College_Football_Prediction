@@ -8,7 +8,7 @@ def load_data(year):
     )
 
     advanced_stats = pd.read_csv(
-        f"data/processed/features/features_{year}.csv"
+        f"data/processed/features/base/features_{year}.csv"
     )
 
     game_team_stats = pd.read_csv(

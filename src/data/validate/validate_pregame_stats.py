@@ -10,11 +10,11 @@ from pathlib import Path
 YEAR = 2025
 
 PREGAME_STATS_PATH = Path(
-    f"data/processed/game_stats/pregame_stats_{YEAR}.csv"
+    f"data/processed/game_stats/game_level/pregame_stats_{YEAR}.csv"
 )
 
 GAME_STATS_PATH = Path(
-    f"data/processed/game_stats/game_stats_{YEAR}.csv"
+    f"data/processed/game_stats/game_level/game_stats_{YEAR}.csv"
 )
 
 GAMES_PATH = Path(

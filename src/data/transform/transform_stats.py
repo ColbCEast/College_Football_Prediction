@@ -51,7 +51,7 @@ def transform_game_stats(year):
     df = pd.concat([df, offense, defense], axis = 1)
 
     # Save flattened data frame
-    df.to_csv(f"data/processed/game_stats/game_stats_{year}.csv", index = False)
+    df.to_csv(f"data/processed/game_stats/game_level/game_stats_{year}.csv", index = False)
 
 def create_pregame_stats(year):
     """
@@ -63,7 +63,7 @@ def create_pregame_stats(year):
     This method is used to prevent data leakage
     """
 
-    filepath = f"data/processed/game_stats/game_stats_{year}.csv"
+    filepath = f"data/processed/game_stats/game_level/game_stats_{year}.csv"
 
     df = pd.read_csv(filepath)
 
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
         stats = create_pregame_stats(year)
 
-        stats.to_csv(f"data/processed/game_stats/pregame_stats_{year}.csv", index = False)
+        stats.to_csv(f"data/processed/game_stats/game_level/pregame_stats_{year}.csv", index = False)
         
         print(stats.shape)
         print(stats.head(20))

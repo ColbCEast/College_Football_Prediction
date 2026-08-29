@@ -7,7 +7,7 @@ import pandas as pd
 
 YEARS = range(2015, 2026)
 
-BASE_PATH = "data/processed/game_features"
+BASE_PATH = "data/processed/features/game_level/"
 
 
 # ============================================================

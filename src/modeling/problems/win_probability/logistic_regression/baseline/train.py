@@ -72,13 +72,15 @@ DATE_COLUMNS = [
     "startDate",
 ]
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+BASE_DIR = Path(__file__).resolve().parents[6]
 
 MODEL_DATA_DIR = (
     BASE_DIR
     / "data"
     / "processed"
-    / "modeling"
+    / "model_inputs"
+    / "win_probabilities"
+    / "logistic_regression"
 )
 
 TRAIN_PATH = MODEL_DATA_DIR / "logistic_regression_train.csv"
@@ -87,14 +89,15 @@ TEST_PATH = MODEL_DATA_DIR / "logistic_regression_test.csv"
 
 OUTPUT_DIR = (
     BASE_DIR
-    / "data"
-    / "processed"
     / "models"
+    / "win_probability"
+    / "logistic_regression"
+    / "baseline"
 )
 
-MODEL_OUTPUT_PATH = OUTPUT_DIR / "logistic_regression_baseline.joblib"
+MODEL_OUTPUT_PATH = OUTPUT_DIR / "baseline.joblib"
 PREDICTIONS_OUTPUT_PATH = (
-    OUTPUT_DIR / "logistic_regression_baseline_predictions.csv"
+    OUTPUT_DIR / "predictions.csv"
 )
 
 

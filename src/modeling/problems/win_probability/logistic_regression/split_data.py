@@ -26,13 +26,15 @@ import pandas as pd
 # CONFIGURATION
 # ============================================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[5]
 
 INPUT_PATH = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "modeling"
+    / "model_inputs"
+    / "win_probability"
+    / "logistic_regression"
     / "logistic_regression_data.csv"
 )
 
@@ -40,7 +42,9 @@ OUTPUT_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "modeling"
+    / "model_inputs"
+    / "win_probability"
+    / "logistic_regression"
 )
 
 TRAIN_PATH = OUTPUT_DIR / "logistic_regression_train.csv"

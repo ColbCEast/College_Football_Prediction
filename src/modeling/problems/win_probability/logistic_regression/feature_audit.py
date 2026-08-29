@@ -74,13 +74,15 @@ from sklearn.preprocessing import StandardScaler
 # CONFIGURATION
 # ============================================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[5]
 
 MODEL_DATA_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "modeling"
+    / "model_inputs"
+    / "win_probability"
+    / "logistic_regression"
 )
 
 TRAIN_PATH = (

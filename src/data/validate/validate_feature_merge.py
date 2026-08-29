@@ -42,11 +42,11 @@ EXPECTED_GAME_ONLY_SEASONS = {
 def load_feature_data(year):
 
     game_features = pd.read_csv(
-        f"data/processed/game_features/game_features_{year}.csv"
+        f"data/processed/features/game_level/game_features_{year}.csv"
     )
 
     advanced_features = pd.read_csv(
-        f"data/processed/features/features_{year}.csv"
+        f"data/processed/features/base/features_{year}.csv"
     )
 
     return game_features, advanced_features

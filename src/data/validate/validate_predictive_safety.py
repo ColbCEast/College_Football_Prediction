@@ -39,7 +39,8 @@ FINAL_FEATURE_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "final_features"
+    / "features"
+    / "final"
 )
 
 YEARS = list(range(2015, 2026))

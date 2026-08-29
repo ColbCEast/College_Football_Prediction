@@ -9,15 +9,15 @@ START_YEAR = 2015
 END_YEAR = 2025
 
 GAME_FEATURE_PATH = (
-    "data/processed/game_features/game_features_{year}.csv"
+    "data/processed/features/game_level/game_features_{year}.csv"
 )
 
 ADVANCED_FEATURE_PATH = (
-    "data/processed/features/features_{year}.csv"
+    "data/processed/features/base/features_{year}.csv"
 )
 
 OUTPUT_PATH = (
-    "data/processed/final_features/final_features_{year}.csv"
+    "data/processed/features/final/final_features_{year}.csv"
 )
 
 

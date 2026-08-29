@@ -618,6 +618,6 @@ if __name__ == "__main__":
 
         team_stats = create_location_stats(team_stats)
 
-        team_stats.to_csv(f"data/processed/game_team_stats/game_team_stats_{year}.csv")
+        team_stats.to_csv(f"data/processed/game_stats/team_level/game_team_stats_{year}.csv")
 
         print(f"{year} data: {team_stats.shape}")

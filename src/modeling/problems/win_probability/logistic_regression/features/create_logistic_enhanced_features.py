@@ -38,27 +38,32 @@ import pandas as pd
 # PROJECT PATHS
 # =============================================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[6]
 
 GAME_TEAM_STATS_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "game_team_stats"
+    / "game_stats"
+    / "team_level"
 )
 
 FINAL_FEATURES_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "final_features"
+    / "features"
+    / "final"
 )
 
 OUTPUT_DIR = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "logistic_enhanced_features"
+    / "features"
+    / "win_probability"
+    / "logistic_regression"
+    / "enhanced"
 )
 
 

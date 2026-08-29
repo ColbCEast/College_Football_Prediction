@@ -42,7 +42,7 @@ REQUIRED_COLUMNS = [
 def load_final_features(year):
 
     path = (
-        f"data/processed/final_features/"
+        f"data/processed/features/final/"
         f"final_features_{year}.csv"
     )
 

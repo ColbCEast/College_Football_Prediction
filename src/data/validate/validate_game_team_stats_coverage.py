@@ -5,8 +5,8 @@ from pathlib import Path
 YEARS = range(2015, 2026)
 
 RAW_GAMES_DIR = Path("data/raw/games")
-TEAM_STATS_DIR = Path("data/processed/game_team_stats")
-GAME_FEATURES_DIR = Path("data/processed/game_features")
+TEAM_STATS_DIR = Path("data/processed/game_stats/team_level")
+GAME_FEATURES_DIR = Path("data/processed/features/game_level")
 
 
 def validate_year(year):
