@@ -1,0 +1,2 @@
+model,feature_count,train_rows,validation_rows,test_rows,n_estimators,max_depth,min_samples_split,min_samples_leaf,max_features,random_state,validation_auc,validation_log_loss,validation_brier_score,validation_accuracy,test_auc,test_log_loss,test_brier_score,test_accuracy
+random_forest_model_2,44,6432,1741,888,500,,2,1,sqrt,42,0.7739492589457967,0.5642699835299775,0.18328672169689975,0.7185525560022975,0.7922324718136237,0.5247910000569379,0.17632736607260793,0.75
