@@ -1,0 +1,8 @@
+parameter,value
+n_estimators,500
+max_features,sqrt
+min_samples_leaf,5
+random_state,42
+n_jobs,-1
+imputation_strategy,median
+feature_scaling,none
