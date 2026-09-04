@@ -1,0 +1,7 @@
+parameter,value
+model__n_estimators,500
+model__min_samples_split,10
+model__min_samples_leaf,30
+model__max_features,0.5
+model__max_depth,20
+model__bootstrap,True
