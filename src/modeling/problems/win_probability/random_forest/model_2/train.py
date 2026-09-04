@@ -11,7 +11,7 @@ Model 1:
     ~310 predictors
 
 Model 2:
-    60 deliberately selected predictors
+    44 deliberately selected predictors
 
 Model 2 adds:
     - Explicit trend features

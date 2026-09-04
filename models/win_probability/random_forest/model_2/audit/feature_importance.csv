@@ -1,0 +1,45 @@
+importance_rank,feature,impurity_importance,feature_family
+1,homePregameElo,0.0938123907966123,Elo
+2,awayPregameElo,0.08640105776359919,Elo
+3,pointDifferentialBefore_home,0.03619402821211879,Core Strength
+4,pointDifferentialBefore_away,0.034018400362702365,Core Strength
+5,pointDifferentialAvgBefore_away,0.029601986930024266,Core Strength
+6,pointDifferentialAvgBefore_home,0.029416491825634262,Core Strength
+7,pointDifferentialAvgLast5_home,0.02823389669522775,Recent Form
+8,pointDifferentialAvgLast5_away,0.025185073940686042,Recent Form
+9,pointDifferentialAvgLast3_away,0.024595076150721006,Recent Form
+10,away_pregame_offense_successRate,0.02398605077834214,Offensive Efficiency
+11,home_pregame_offense_successRate,0.022744481377233772,Offensive Efficiency
+12,pointDifferentialAvgLast3_home,0.022583148344671716,Recent Form
+13,home_pregame_offense_ppa,0.022012088546251998,Offensive Efficiency
+14,away_pregame_defense_successRate,0.021901887657133023,Defensive Efficiency
+15,yardsPerPassAttemptBefore_home,0.02133628087533992,Offensive Efficiency
+16,home_pregame_defense_successRate,0.021053163175905606,Defensive Efficiency
+17,priorSOSPointDiff_away,0.02100318713451032,Prior SOS
+18,yardsPerRushAttemptBefore_home,0.0209871902536933,Offensive Efficiency
+19,away_pregame_offense_ppa,0.02082673113972745,Offensive Efficiency
+20,pointsForAvgLast5_home,0.020672569869576163,Recent Form
+21,home_pregame_defense_ppa,0.020505335525655977,Defensive Efficiency
+22,yardsPerPassAttemptBefore_away,0.02037622441166398,Offensive Efficiency
+23,pointsAgainstAvgLast5_away,0.01985931173899096,Recent Form
+24,pointsForAvgLast5_away,0.019782161457218297,Recent Form
+25,pointsAgainstAvgLast5_home,0.01945398576604515,Recent Form
+26,away_pregame_defense_ppa,0.019101138878024483,Defensive Efficiency
+27,yardsPerRushAttemptBefore_away,0.018539190075065465,Offensive Efficiency
+28,winPctBefore_home,0.018449529954948193,Core Strength
+29,priorSOSPointDiff_home,0.01829703542780353,Prior SOS
+30,winPctBefore_away,0.016830542835982575,Core Strength
+31,priorSOSWinPct_home,0.016344711220908355,Prior SOS
+32,priorSOSWinPct_away,0.015267822580378976,Prior SOS
+33,netPassingYardsTrend_home,0.013627652729999794,Trend
+34,totalYardsTrend_away,0.013623021196610553,Trend
+35,netPassingYardsTrend_away,0.013568543803960414,Trend
+36,pointsAgainstTrend_home,0.013361856086941737,Trend
+37,pointsAgainstTrend_away,0.013266713500344574,Trend
+38,pointsForTrend_home,0.012889615587070679,Trend
+39,totalYardsTrend_home,0.012770617902672747,Trend
+40,pointDifferentialTrend_away,0.012494207307603322,Trend
+41,pointsForTrend_away,0.012413437496388952,Trend
+42,pointDifferentialTrend_home,0.011723517763355706,Trend
+43,winPctTrend_away,0.010557207907786205,Trend
+44,winPctTrend_home,0.01033143701486807,Trend
