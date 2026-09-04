@@ -1,0 +1,3 @@
+split,rows,agreement_rate,disagreement_rate,disagreement_count,both_correct,both_wrong,model_2_only_correct,model_3_only_correct,mean_absolute_probability_difference,median_absolute_probability_difference,max_absolute_probability_difference
+test,888,0.9527027027027027,0.04729729729729726,42,641,205,25,17,0.034944467616802324,0.027999999999999914,0.18799999999999994
+validation,1741,0.941987363584147,0.05801263641585297,101,1202,438,49,52,0.03356132149482933,0.026000000000000023,0.16199999999999992
