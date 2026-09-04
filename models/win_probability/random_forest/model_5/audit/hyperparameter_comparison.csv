@@ -1,0 +1,8 @@
+parameter,model_4,model_5,same
+750,5.0,,False
+model__bootstrap,,True,False
+model__max_depth,,20,False
+model__max_features,,0.5,False
+model__min_samples_leaf,,30,False
+model__min_samples_split,,10,False
+model__n_estimators,,500,False
