@@ -1,0 +1,2 @@
+model,calibration_methods,calibration_training_period,test_period,validation_rows,test_rows,validation_winner_by_log_loss,test_best_log_loss_method,test_best_brier_method,test_best_ece_method,test_best_mce_method,test_best_auc_method,random_state,calibration_bins
+random_forest_model_4,"raw_model_4,sigmoid,isotonic",2023-2024,2025,1741,888,isotonic,isotonic,isotonic,isotonic,sigmoid,raw_model_4,42,10
