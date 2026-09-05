@@ -1,0 +1,2 @@
+model,feature_count,train_rows,validation_rows,test_rows,n_estimators,learning_rate,max_depth,min_samples_leaf,subsample,random_state,validation_auc,validation_log_loss,validation_brier_score,validation_accuracy,test_auc,test_log_loss,test_brier_score,test_accuracy
+gradient_boosting_model_2,44,6432,1741,888,500,0.05,3,5,1.0,42,0.7885829778381905,0.5303220228578416,0.17816601698855444,0.7352096496266514,0.7986703232776531,0.5134625466497108,0.17115395665491964,0.7466216216216216

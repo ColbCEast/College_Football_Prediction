@@ -1,0 +1,45 @@
+feature_rank,feature,feature_group
+1,homePregameElo,Core strength
+2,awayPregameElo,Core strength
+3,winPctBefore_home,Core strength
+4,winPctBefore_away,Core strength
+5,pointDifferentialBefore_home,Core strength
+6,pointDifferentialBefore_away,Core strength
+7,pointDifferentialAvgBefore_home,Core strength
+8,pointDifferentialAvgBefore_away,Core strength
+9,pointDifferentialAvgLast3_home,Recent form
+10,pointDifferentialAvgLast3_away,Recent form
+11,pointDifferentialAvgLast5_home,Recent form
+12,pointDifferentialAvgLast5_away,Recent form
+13,pointsForAvgLast5_home,Recent form
+14,pointsForAvgLast5_away,Recent form
+15,pointsAgainstAvgLast5_home,Recent form
+16,pointsAgainstAvgLast5_away,Recent form
+17,pointsForTrend_home,Trend
+18,pointsForTrend_away,Trend
+19,pointsAgainstTrend_home,Trend
+20,pointsAgainstTrend_away,Trend
+21,pointDifferentialTrend_home,Trend
+22,pointDifferentialTrend_away,Trend
+23,totalYardsTrend_home,Trend
+24,totalYardsTrend_away,Trend
+25,netPassingYardsTrend_home,Trend
+26,netPassingYardsTrend_away,Trend
+27,winPctTrend_home,Trend
+28,winPctTrend_away,Trend
+29,priorSOSWinPct_home,Prior SOS
+30,priorSOSWinPct_away,Prior SOS
+31,priorSOSPointDiff_home,Prior SOS
+32,priorSOSPointDiff_away,Prior SOS
+33,home_pregame_offense_successRate,Offensive efficiency
+34,away_pregame_offense_successRate,Offensive efficiency
+35,home_pregame_offense_ppa,Offensive efficiency
+36,away_pregame_offense_ppa,Offensive efficiency
+37,yardsPerPassAttemptBefore_home,Offensive efficiency
+38,yardsPerPassAttemptBefore_away,Offensive efficiency
+39,yardsPerRushAttemptBefore_home,Offensive efficiency
+40,yardsPerRushAttemptBefore_away,Offensive efficiency
+41,home_pregame_defense_successRate,Defensive efficiency
+42,away_pregame_defense_successRate,Defensive efficiency
+43,home_pregame_defense_ppa,Defensive efficiency
+44,away_pregame_defense_ppa,Defensive efficiency
