@@ -1,0 +1,9 @@
+parameter,value
+n_estimators,500
+learning_rate,0.05
+max_depth,3
+min_samples_leaf,5
+subsample,1.0
+random_state,42
+imputation_strategy,median
+feature_scaling,none
