@@ -1,0 +1,16 @@
+metric,value
+predictor_count,310.0
+n_estimators,500.0
+learning_rate,0.05
+max_depth,3.0
+min_samples_leaf,5.0
+subsample,1.0
+random_state,42.0
+validation_log_loss,0.5193286971502511
+test_log_loss,0.5015710014339535
+validation_brier_score,0.17360603430971688
+test_brier_score,0.16659701094541896
+validation_auc,0.8000827826364488
+test_auc,0.8124684894318404
+validation_accuracy,0.746122917863297
+test_accuracy,0.759009009009009
