@@ -1,0 +1,2 @@
+model,feature_count,train_rows,validation_rows,test_rows,validation_log_loss,validation_brier_score,validation_roc_auc,validation_accuracy,test_log_loss,test_brier_score,test_roc_auc,test_accuracy,validation_mean_probability,test_mean_probability,validation_std_probability,test_std_probability
+Gradient Boosting Model 2,44,6432,1741,888,0.5303220228578416,0.17816601698855444,0.7885829778381905,0.7352096496266514,0.5134625466497108,0.17115395665491964,0.7986703232776531,0.7466216216216216,0.6201857667559257,0.6180262446734753,0.2530142088514842,0.24774931103101389
