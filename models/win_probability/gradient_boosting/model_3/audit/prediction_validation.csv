@@ -1,0 +1,3 @@
+dataset,expected_rows,actual_rows,row_count_pass,probability_column,null_probabilities,probabilities_below_zero,probabilities_above_one
+Validation,1741,1741,True,win_home_probability,0,0,0
+Test,888,888,True,win_home_probability,0,0,0

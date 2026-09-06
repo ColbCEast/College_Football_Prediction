@@ -1,0 +1,7 @@
+parameter,expected_value,actual_value,match
+n_estimators,500.0,500.0,True
+learning_rate,0.05,0.05,True
+max_depth,3.0,3.0,True
+min_samples_leaf,5.0,5.0,True
+subsample,1.0,1.0,True
+random_state,42.0,42.0,True

@@ -1,0 +1,4 @@
+dataset,rows,columns,expected_rows,expected_columns,shape_pass,target_present,target_nulls,seasons
+Training,6432,315,6432,315,True,True,0,"2015,2016,2017,2018,2019,2020,2021,2022"
+Validation,1741,315,1741,315,True,True,0,"2023,2024"
+Test,888,315,888,315,True,True,0,2025
