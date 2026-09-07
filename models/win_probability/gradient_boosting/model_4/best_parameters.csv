@@ -1,0 +1,2 @@
+n_estimators,learning_rate,max_depth,min_samples_leaf,subsample,mean_cv_log_loss,std_cv_log_loss,mean_cv_brier_score,mean_cv_roc_auc,mean_cv_accuracy,random_state
+200,0.03,4,10,0.75,0.5291147369968893,0.02720184975670466,0.17667472046012397,0.7927081086284712,0.7273439240264458,42
