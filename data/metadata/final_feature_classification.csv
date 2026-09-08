@@ -369,8 +369,8 @@ sacksBefore_home,pregame,True,final_schema_rule,historical statistic accumulated
 sacks_away,current_game,False,final_schema_rule,current-game statistic
 sacks_home,current_game,False,final_schema_rule,current-game statistic
 season,identifier,False,final_schema_rule,identifier column
-seasonType,static_pregame,True,final_schema_rule,known before kickoff
-startDate,static_pregame,True,final_schema_rule,known before kickoff
+seasonType,static_pregame,False,final_schema_rule,known before kickoff
+startDate,static_pregame,False,final_schema_rule,known before kickoff
 startTimeTBD,metadata,False,final_schema_rule,game metadata
 tacklesForLossAvgBefore_away,pregame,True,final_schema_rule,historical statistic accumulated before current game
 tacklesForLossAvgBefore_home,pregame,True,final_schema_rule,historical statistic accumulated before current game
