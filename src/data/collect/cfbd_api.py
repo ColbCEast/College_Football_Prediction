@@ -183,7 +183,34 @@ def add_week_to_season_game_team_stats(year, week):
     print(f"Week {week} rows: {len(week_stats)}")
     print(f"Updated rows: {len(updated_stats)}")
 
+def get_player_returning(year):
+    url = f"{BASE_URL}/player/returning"
+
+    params = {
+        "year": year
+    }
+
+    response = requests.get(
+        url,
+        headers=headers,
+        params=params
+    )
+
+    response.raise_for_status()
+
+    return pd.DataFrame(response.json())
+
+def save_player_returning(year):
+    returning = get_player_returning(year)
+
+    os.makedirs("data/raw/player/returning", exist_ok=True)
+
+    filepath = f"data/raw/player/returning/player_returning_{year}.csv"
+
+    returning.to_csv(filepath, index=False)
+
+    print(f"Saved {year}: {len(returning):,} team records")
 
 if __name__ == "__main__":
-    for year in [2020, 2024, 2025]:
-        add_week_to_season_game_team_stats(year, 16)
+    for year in range(2015, 2026):
+        save_player_returning(year)
