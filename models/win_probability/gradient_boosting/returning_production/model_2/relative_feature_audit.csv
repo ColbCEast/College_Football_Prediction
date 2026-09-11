@@ -1,0 +1,9 @@
+feature,present_in_feature_list,present_in_importance,importance
+returning_total_ppa_diff,True,True,0.0412790740825784
+returning_passing_ppa_diff,True,True,0.0042563840164512
+returning_receiving_ppa_diff,True,True,0.0111020025045115
+returning_rushing_ppa_diff,True,True,0.0036770607197181
+returning_usage_diff,True,True,0.0018659981920113
+returning_passing_usage_diff,True,True,0.0028038163122518
+returning_receiving_usage_diff,True,True,0.0156164074559671
+returning_rushing_usage_diff,True,True,0.0036604526225421

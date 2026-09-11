@@ -1,0 +1,2 @@
+audit,overall_passed,baseline_features,relative_features,total_features,validation_rows,test_rows,validation_log_loss,test_log_loss,validation_brier_score,test_brier_score,validation_roc_auc,test_roc_auc
+Experiment 2,True,310,8,318,1741,888,0.5195265342480907,0.5060209120674015,0.17301245679157023,0.1671598497913407,0.7986287433852256,0.8109753732790381
