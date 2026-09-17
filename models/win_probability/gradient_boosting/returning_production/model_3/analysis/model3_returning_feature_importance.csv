@@ -1,0 +1,9 @@
+returning_rank,phase_feature,importance,importance_pct,global_rank
+1,returning_total_ppa_diff_phase,0.0362055598481143,3.620555984811485,3
+2,returning_receiving_ppa_diff_phase,0.0110318493546557,1.103184935465587,7
+3,returning_receiving_usage_diff_phase,0.010385819768745,1.038581976874516,8
+4,returning_rushing_ppa_diff_phase,0.005045724348477,0.5045724348477078,21
+5,returning_passing_ppa_diff_phase,0.0042892474297289,0.4289247429728966,26
+6,returning_passing_usage_diff_phase,0.0028330357304485,0.2833035730448544,33
+7,returning_rushing_usage_diff_phase,0.0026812366176466,0.2681236617646641,36
+8,returning_usage_diff_phase,0.0019133691030404,0.19133691030404293,72
