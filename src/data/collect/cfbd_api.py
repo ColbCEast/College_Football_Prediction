@@ -211,6 +211,36 @@ def save_player_returning(year):
 
     print(f"Saved {year}: {len(returning):,} team records")
 
+def get_recruiting_players(year):
+    url = f"{BASE_URL}/recruiting/players"
+
+    params = {
+        "year": year
+    }
+
+    response = requests.get(
+        url,
+        headers=headers,
+        params=params
+    )
+
+    response.raise_for_status()
+
+    return pd.DataFrame(response.json())
+
+
+def save_recruiting_players(year):
+    recruiting = get_recruiting_players(year)
+
+    os.makedirs("data/raw/player/recruiting", exist_ok=True)
+
+    filepath = f"data/raw/player/recruiting/player_recruiting_{year}.csv"
+
+    recruiting.to_csv(filepath, index=False)
+
+    print(f"Saved {year}: {len(recruiting):,} player records")
+
+
 if __name__ == "__main__":
-    for year in range(2015, 2026):
-        save_player_returning(year)
+    for year in range(2015, 2025):
+        save_recruiting_players(year)
