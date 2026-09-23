@@ -241,6 +241,36 @@ def save_recruiting_players(year):
     print(f"Saved {year}: {len(recruiting):,} player records")
 
 
+def get_transfer_data(year):
+    url = f"{BASE_URL}/player/portal"
+
+    params = {
+        "year": year
+    }
+
+    response = requests.get(
+        url,
+        headers=headers,
+        params=params
+    )
+
+    response.raise_for_status()
+
+    return pd.DataFrame(response.json())
+
+
+def save_transfer_data(year):
+    transfer = get_transfer_data(year)
+
+    os.makedirs("data/raw/player/portal", exist_ok=True)
+
+    filepath = f"data/raw/player/portal/player_transfer_{year}.csv"
+
+    transfer.to_csv(filepath, index=False)
+
+    print(f"Saved {year}: {len(transfer):,} player records")
+
+
 if __name__ == "__main__":
     for year in range(2015, 2025):
-        save_recruiting_players(year)
+        save_transfer_data(year)
