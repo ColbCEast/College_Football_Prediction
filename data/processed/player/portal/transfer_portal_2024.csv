@@ -1,4 +1,4 @@
-season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_completed_transfer,rating,has_rating,stars,has_stars
+season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_nonwithdrawn_destination,rating,has_rating,stars,has_stars
 2024,Julian,Humphrey,CB,Georgia,,2024-01-03 00:27:00+00:00,2024,Immediate,False,False,False,,False,4.0,True
 2024,Danny,Saili,DL,BYU,Arkansas,2024-05-01 01:55:00+00:00,2024,Immediate,False,True,True,0.87,True,3.0,True
 2024,Kyle,Williams,WR,Washington State,,2023-12-27 18:20:00+00:00,2023,Immediate,False,False,False,,False,3.0,True

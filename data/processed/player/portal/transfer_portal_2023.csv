@@ -1,4 +1,4 @@
-season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_completed_transfer,rating,has_rating,stars,has_stars
+season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_nonwithdrawn_destination,rating,has_rating,stars,has_stars
 2023,Jamar,Rucks,DL,App State,Kennesaw State,2022-12-05 11:46:00+00:00,2022,Immediate,False,True,True,,False,3.0,True
 2023,Joshua,Farmer,DL,Florida State,,2023-04-27 17:23:00+00:00,2023,Immediate,False,False,False,,False,3.0,True
 2023,A'Jon,Vivens,RB,Colorado State,,2022-10-31 21:23:00+00:00,2022,Immediate,False,False,False,,False,3.0,True

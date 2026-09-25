@@ -1,4 +1,4 @@
-season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_completed_transfer,rating,has_rating,stars,has_stars
+season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_nonwithdrawn_destination,rating,has_rating,stars,has_stars
 2021,Cameron,Wilkins,LB,Missouri,UTSA,2021-07-31 14:46:00+00:00,2021,Immediate,False,True,True,,False,3.0,True
 2021,Javar,Strong,S,Arkansas State,,2021-07-28 15:25:00+00:00,2021,Immediate,False,False,False,,False,3.0,True
 2021,Noah,Mitchell,LB,UTSA,,2021-07-27 15:22:00+00:00,2021,Immediate,False,False,False,,False,3.0,True

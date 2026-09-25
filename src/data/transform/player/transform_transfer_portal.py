@@ -19,9 +19,9 @@ def transform_transfer_portal(year):
 
     df = pd.read_csv(input_path)
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Standardize column names
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     df = df.rename(
         columns={
@@ -38,9 +38,9 @@ def transform_transfer_portal(year):
         }
     )
 
-    # ------------------------------------------------------------------
-    # Standardize transfer date
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Data types
+    # -------------------------------------------------------------------------
 
     df["transfer_date"] = pd.to_datetime(
         df["transfer_date"],
@@ -48,38 +48,41 @@ def transform_transfer_portal(year):
         utc=True
     )
 
-    # ------------------------------------------------------------------
-    # Transfer status indicators
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Transfer status / availability flags
+    # -------------------------------------------------------------------------
 
     df["has_destination"] = df["destination"].notna()
 
-    df["is_withdrawn"] = (
-        df["eligibility"].eq("Withdrawn")
-    )
+    df["is_withdrawn"] = df["eligibility"].eq("Withdrawn")
 
-    df["is_completed_transfer"] = (
+    # Descriptive flag:
+    # destination is present and the record is not marked Withdrawn.
+    #
+    # This intentionally does NOT call the transfer "completed" because
+    # some non-withdrawn records can have eligibility values such as TBD.
+    df["is_nonwithdrawn_destination"] = (
         df["has_destination"]
         & ~df["is_withdrawn"]
     )
 
-    # ------------------------------------------------------------------
-    # Talent-data availability indicators
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Talent availability flags
+    # -------------------------------------------------------------------------
 
     df["has_rating"] = df["rating"].notna()
 
     df["has_stars"] = df["stars"].notna()
 
-    # ------------------------------------------------------------------
-    # Calendar date information
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Transfer date information
+    # -------------------------------------------------------------------------
 
     df["transfer_year"] = df["transfer_date"].dt.year
 
-    # ------------------------------------------------------------------
-    # Column ordering
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Final column order
+    # -------------------------------------------------------------------------
 
     columns = [
         "season",
@@ -93,7 +96,7 @@ def transform_transfer_portal(year):
         "eligibility",
         "is_withdrawn",
         "has_destination",
-        "is_completed_transfer",
+        "is_nonwithdrawn_destination",
         "rating",
         "has_rating",
         "stars",
@@ -102,11 +105,14 @@ def transform_transfer_portal(year):
 
     df = df[columns]
 
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Save
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(
+        OUTPUT_DIR,
+        exist_ok=True
+    )
 
     df.to_csv(
         output_path,

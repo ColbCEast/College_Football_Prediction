@@ -1,4 +1,4 @@
-season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_completed_transfer,rating,has_rating,stars,has_stars
+season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_nonwithdrawn_destination,rating,has_rating,stars,has_stars
 2025,Josiah,Harris,CB,Campbellsville,Gardner-Webb,2025-05-01 05:00:00+00:00,2025,Immediate,False,True,True,,False,,False
 2025,Isaiah,Rogers,DL,Monmouth,Cincinnati,2025-04-23 01:29:00+00:00,2025,Immediate,False,True,True,0.84,True,3.0,True
 2025,Austin,Collins,IOL,Louisville,Syracuse,2025-04-19 21:19:00+00:00,2025,Immediate,False,True,True,0.86,True,3.0,True

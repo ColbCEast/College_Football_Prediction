@@ -1,4 +1,4 @@
-season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_completed_transfer,rating,has_rating,stars,has_stars
+season,first_name,last_name,position,origin,destination,transfer_date,transfer_year,eligibility,is_withdrawn,has_destination,is_nonwithdrawn_destination,rating,has_rating,stars,has_stars
 2022,Michael,Edwards,LB,Georgia Southern,East Carolina,2022-04-26 16:02:00+00:00,2022,Immediate,False,True,True,,False,3.0,True
 2022,Ray,Rose,WR,East Carolina,Tennessee State,2022-05-23 19:41:00+00:00,2022,Immediate,False,True,True,,False,4.0,True
 2022,Isaiah,Johnson,CB,Dartmouth,Syracuse,2022-02-07 16:48:00+00:00,2022,Immediate,False,True,True,,False,,False
