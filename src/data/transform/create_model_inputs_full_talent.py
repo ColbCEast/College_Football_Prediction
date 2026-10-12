@@ -1,13 +1,23 @@
 """
-Create Model 5 full-talent modeling input datasets.
+Create GB Model 4 + relative talent modeling input datasets.
+
+Purpose
+-------
+Keep the exact 28 predictors from GB Model 4 and add 37 home-minus-away
+talent features:
+    - 12 returning-production differences
+    - 7 recruiting differences
+    - 18 transfer-portal differences
 
 Source:
     data/processed/features/full_talent/full_talent_features_{year}.csv
 
 Output:
-    data/processed/model_inputs/win_probability/full_talent/train.csv
-    data/processed/model_inputs/win_probability/full_talent/validation.csv
-    data/processed/model_inputs/win_probability/full_talent/test.csv
+    data/processed/model_inputs/win_probability/talent/train.csv
+    data/processed/model_inputs/win_probability/talent/validation.csv
+    data/processed/model_inputs/win_probability/talent/test.csv
+    data/processed/model_inputs/win_probability/talent/feature_list.csv
+    data/processed/model_inputs/win_probability/talent/season_audit.csv
 
 Temporal split:
     Train:      2015-2022
@@ -15,13 +25,12 @@ Temporal split:
     Test:       2025
 
 Important:
-    - The 2021+ transfer features are added to the common schema.
-    - 2015-2020 observations receive NaN for transfer features because
-      the source data does not exist for those seasons.
-    - No imputation is performed here.
-    - No scaling is performed here.
-    - No feature selection is performed here.
-    - 2025 remains completely separate as the final test set.
+    - The baseline predictor set is fixed to the exact 28 GB Model 4 features.
+    - Every talent feature is calculated as home value minus away value.
+    - Transfer data is unavailable before 2021. Transfer differences for
+      2015-2020 are NaN; no values are fabricated or imputed.
+    - No imputation, scaling, or feature selection is performed here.
+    - Existing full_talent datasets are not modified.
 """
 
 from pathlib import Path
@@ -33,6 +42,9 @@ import pandas as pd
 # PROJECT PATHS
 # =============================================================================
 
+# Expected location:
+#   src/data/transform/create_model_inputs_gb4_talent.py
+# parents[3] = project root
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 SOURCE_DIR = (
@@ -49,23 +61,25 @@ OUTPUT_DIR = (
     / "processed"
     / "model_inputs"
     / "win_probability"
-    / "full_talent"
+    / "talent"
 )
 
 
 # =============================================================================
-# TEMPORAL SPLITS
+# TEMPORAL SPLITS AND COLUMN NAMES
 # =============================================================================
 
 TRAIN_YEARS = list(range(2015, 2023))
 VALIDATION_YEARS = [2023, 2024]
 TEST_YEARS = [2025]
+ALL_YEARS = TRAIN_YEARS + VALIDATION_YEARS + TEST_YEARS
 
-ALL_YEARS = (
-    TRAIN_YEARS
-    + VALIDATION_YEARS
-    + TEST_YEARS
-)
+TARGET_COLUMN = "win_home"
+SEASON_COLUMN = "season"
+GAME_ID_COLUMN = "gameId"
+
+METADATA_COLUMNS = [SEASON_COLUMN, GAME_ID_COLUMN]
+REQUIRED_COLUMNS = METADATA_COLUMNS + [TARGET_COLUMN]
 
 
 # =============================================================================
@@ -88,30 +102,163 @@ EXPECTED_ROWS = {
 
 
 # =============================================================================
-# MODEL COLUMNS
+# EXACT GB MODEL 4 BASELINE FEATURES (28)
 # =============================================================================
 
-TARGET_COLUMN = "win_home"
+BASELINE_FEATURES = [
+    # Core strength (8)
+    "homePregameElo",
+    "awayPregameElo",
+    "winPctBefore_home",
+    "winPctBefore_away",
+    "pointDifferentialBefore_home",
+    "pointDifferentialBefore_away",
+    "pointDifferentialAvgBefore_home",
+    "pointDifferentialAvgBefore_away",
 
-METADATA_COLUMNS = [
-    "season",
-    "gameId",
+    # Recent form (8)
+    "pointDifferentialAvgLast3_home",
+    "pointDifferentialAvgLast3_away",
+    "pointDifferentialAvgLast5_home",
+    "pointDifferentialAvgLast5_away",
+    "pointsForAvgLast5_home",
+    "pointsForAvgLast5_away",
+    "pointsAgainstAvgLast5_home",
+    "pointsAgainstAvgLast5_away",
+
+    # Offensive efficiency (8)
+    "home_pregame_offense_successRate",
+    "away_pregame_offense_successRate",
+    "home_pregame_offense_ppa",
+    "away_pregame_offense_ppa",
+    "yardsPerPassAttemptBefore_home",
+    "yardsPerPassAttemptBefore_away",
+    "yardsPerRushAttemptBefore_home",
+    "yardsPerRushAttemptBefore_away",
+
+    # Defensive efficiency (4)
+    "home_pregame_defense_successRate",
+    "away_pregame_defense_successRate",
+    "home_pregame_defense_ppa",
+    "away_pregame_defense_ppa",
 ]
 
-REQUIRED_COLUMNS = [
-    "season",
-    "gameId",
-    TARGET_COLUMN,
+
+# =============================================================================
+# TALENT SOURCE FEATURES
+# =============================================================================
+
+RETURNING_FEATURES = [
+    "returning_total_ppa",
+    "returning_passing_ppa",
+    "returning_receiving_ppa",
+    "returning_rushing_ppa",
+    "returning_percent_ppa",
+    "returning_percent_passing_ppa",
+    "returning_percent_receiving_ppa",
+    "returning_percent_rushing_ppa",
+    "returning_usage",
+    "returning_passing_usage",
+    "returning_receiving_usage",
+    "returning_rushing_usage",
 ]
 
+RECRUITING_FEATURES = [
+    "recruiting_count",
+    "recruiting_rated_count",
+    "recruiting_avg_rating",
+    "recruiting_max_rating",
+    "recruiting_5star_count",
+    "recruiting_4star_count",
+    "recruiting_top_100_count",
+]
+
+TRANSFER_FEATURES = [
+    "incoming_transfer_count",
+    "incoming_rated_player_count",
+    "incoming_rating_sum",
+    "incoming_rating_mean",
+    "incoming_star_rated_player_count",
+    "incoming_2_star_count",
+    "incoming_3_star_count",
+    "incoming_4_star_count",
+    "incoming_5_star_count",
+    "outgoing_transfer_count",
+    "outgoing_rated_player_count",
+    "outgoing_rating_sum",
+    "outgoing_rating_mean",
+    "outgoing_star_rated_player_count",
+    "outgoing_2_star_count",
+    "outgoing_3_star_count",
+    "outgoing_4_star_count",
+    "outgoing_5_star_count",
+]
+
+TALENT_FEATURE_GROUPS = {
+    "returning_production": RETURNING_FEATURES,
+    "recruiting": RECRUITING_FEATURES,
+    "transfer_portal": TRANSFER_FEATURES,
+}
+
+TALENT_FEATURES = [
+    f"{feature}_diff"
+    for features in TALENT_FEATURE_GROUPS.values()
+    for feature in features
+]
+
+TRANSFER_FEATURES_DIFF = [
+    f"{feature}_diff" for feature in TRANSFER_FEATURES
+]
+
+MODEL_FEATURES = BASELINE_FEATURES + TALENT_FEATURES
+
+OUTPUT_COLUMNS = (
+    METADATA_COLUMNS
+    + MODEL_FEATURES
+    + [TARGET_COLUMN]
+)
+
 
 # =============================================================================
-# HELPERS
+# VALIDATION HELPERS
 # =============================================================================
+
+def require_columns(df, columns, dataset_name):
+    """Raise a clear error when required columns are missing."""
+    missing = [
+        column for column in columns
+        if column not in df.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            f"{dataset_name} is missing required columns:\n{missing}"
+        )
+
+
+def validate_unique_key(df, columns, dataset_name):
+    """Require uniqueness for the provided key."""
+    duplicate_mask = df.duplicated(
+        subset=columns,
+        keep=False,
+    )
+
+    if duplicate_mask.any():
+        examples = (
+            df.loc[duplicate_mask, columns]
+            .sort_values(columns)
+            .head(20)
+        )
+
+        raise ValueError(
+            f"{dataset_name} contains duplicate key values "
+            f"for {columns}.\n"
+            f"Examples:\n{examples.to_string(index=False)}"
+        )
+
 
 def load_season(year):
-    """Load one full-talent season file."""
-
+    """Load and validate one season's full-talent feature file."""
     path = SOURCE_DIR / f"full_talent_features_{year}.csv"
 
     if not path.exists():
@@ -121,6 +268,64 @@ def load_season(year):
 
     df = pd.read_csv(path)
 
+    if df.empty:
+        raise ValueError(
+            f"{year}: source file contains no rows:\n{path}"
+        )
+
+    require_columns(
+        df,
+        REQUIRED_COLUMNS,
+        f"Full-talent source {year}",
+    )
+
+    expected_rows = EXPECTED_ROWS[year]
+
+    if len(df) != expected_rows:
+        raise ValueError(
+            f"{year}: expected {expected_rows:,} rows, "
+            f"found {len(df):,}."
+        )
+
+    if df[SEASON_COLUMN].isna().any():
+        raise ValueError(
+            f"{year}: season contains missing values."
+        )
+
+    observed_seasons = sorted(
+        df[SEASON_COLUMN].astype(int).unique().tolist()
+    )
+
+    if observed_seasons != [year]:
+        raise ValueError(
+            f"{year}: expected season value [{year}], "
+            f"found {observed_seasons}."
+        )
+
+    if df[GAME_ID_COLUMN].isna().any():
+        raise ValueError(
+            f"{year}: gameId contains missing values."
+        )
+
+    validate_unique_key(
+        df,
+        [GAME_ID_COLUMN],
+        f"Full-talent source {year}",
+    )
+
+    if df[TARGET_COLUMN].isna().any():
+        raise ValueError(
+            f"{year}: {TARGET_COLUMN} contains missing values."
+        )
+
+    target_values = set(df[TARGET_COLUMN].unique().tolist())
+
+    if not target_values.issubset({0, 1}):
+        raise ValueError(
+            f"{year}: target must be binary 0/1; "
+            f"found {target_values}."
+        )
+
     print(
         f"Loaded {year}: "
         f"{len(df):,} rows × {len(df.columns):,} columns"
@@ -129,109 +334,103 @@ def load_season(year):
     return df
 
 
-def validate_season(df, year):
-    """Validate basic requirements before combining seasons."""
+# =============================================================================
+# BUILD MODEL INPUT DATASET
+# =============================================================================
 
-    expected_rows = EXPECTED_ROWS[year]
-
-    if len(df) != expected_rows:
-        raise ValueError(
-            f"{year}: expected {expected_rows} rows, "
-            f"found {len(df)}"
-        )
-
-    missing_columns = [
-        column
-        for column in REQUIRED_COLUMNS
-        if column not in df.columns
-    ]
-
-    if missing_columns:
-        raise ValueError(
-            f"{year}: missing required columns: {missing_columns}"
-        )
-
-    if df["gameId"].duplicated().any():
-        duplicate_count = df["gameId"].duplicated().sum()
-
-        raise ValueError(
-            f"{year}: found {duplicate_count} duplicate gameId values"
-        )
-
-    invalid_season = (df["season"] != year).sum()
-
-    if invalid_season:
-        raise ValueError(
-            f"{year}: found {invalid_season} rows with "
-            f"season != filename season"
-        )
-
-    missing_target = df[TARGET_COLUMN].isna().sum()
-
-    if missing_target:
-        raise ValueError(
-            f"{year}: found {missing_target} missing target values"
-        )
-
-    target_values = set(df[TARGET_COLUMN].unique())
-
-    if not target_values.issubset({0, 1}):
-        raise ValueError(
-            f"{year}: target contains non-binary values: "
-            f"{sorted(target_values)}"
-        )
-
-
-def build_common_schema(frames):
+def build_model_input(df, year):
     """
-    Build the union of all source columns while preserving the ordering
-    from the first full-talent dataset.
+    Select the exact baseline and create home-minus-away talent differences.
 
-    Transfer features introduced in 2021 are therefore added to the
-    pre-2021 rows as NaN rather than being dropped.
+    Returning-production and recruiting columns must exist as home_/away_
+    columns in every season. Transfer source data may be absent before 2021.
     """
-
-    common_columns = list(frames[0].columns)
-
-    for df in frames[1:]:
-        for column in df.columns:
-            if column not in common_columns:
-                common_columns.append(column)
-
-    return common_columns
-
-
-def align_to_schema(df, columns):
-    """Return a dataframe containing the complete common schema."""
-
-    return df.reindex(columns=columns)
-
-
-def combine_years(years, common_columns):
-    """Load, validate, align, and combine seasons."""
-
-    frames = []
-
-    for year in years:
-
-        df = load_season(year)
-
-        validate_season(df, year)
-
-        df = align_to_schema(
-            df,
-            common_columns,
-        )
-
-        frames.append(df)
-
-    combined = pd.concat(
-        frames,
-        axis=0,
-        ignore_index=True,
+    require_columns(
+        df,
+        BASELINE_FEATURES,
+        f"Full-talent source {year} baseline predictors",
     )
 
-    return combined
+    output = df[
+        METADATA_COLUMNS + BASELINE_FEATURES
+    ].copy()
+
+    created_by_group = {}
+
+    for group_name, features in TALENT_FEATURE_GROUPS.items():
+        created_by_group[group_name] = []
+
+        for feature in features:
+            home_column = f"home_{feature}"
+            away_column = f"away_{feature}"
+            difference_column = f"{feature}_diff"
+
+            if group_name == "transfer_portal" and year < 2021:
+                # Transfer data is unavailable for these seasons.
+                # Set every transfer difference to NaN explicitly.
+                output[difference_column] = float("nan")
+                created_by_group[group_name].append(
+                    difference_column
+                )
+                continue
+
+            require_columns(
+                df,
+                [home_column, away_column],
+                f"Full-talent source {year} {group_name} predictors",
+            )
+
+            home_values = pd.to_numeric(
+                df[home_column],
+                errors="raise",
+            )
+
+            away_values = pd.to_numeric(
+                df[away_column],
+                errors="raise",
+            )
+
+            output[difference_column] = (
+                home_values - away_values
+            )
+
+            created_by_group[group_name].append(
+                difference_column
+            )
+
+    output[TARGET_COLUMN] = df[TARGET_COLUMN].astype(int)
+
+    # Enforce a stable, explicit schema and column ordering.
+    output = output[OUTPUT_COLUMNS]
+
+    if len(output) != len(df):
+        raise ValueError(
+            f"{year}: row count changed while building model inputs "
+            f"({len(df):,} -> {len(output):,})."
+        )
+
+    validate_unique_key(
+        output,
+        [GAME_ID_COLUMN],
+        f"Model input {year}",
+    )
+
+    # Before 2021, all transfer differences must be missing.
+    if year < 2021:
+        nonmissing_transfer = (
+            output[TRANSFER_FEATURES_DIFF]
+            .notna()
+            .sum()
+            .sum()
+        )
+
+        if nonmissing_transfer:
+            raise ValueError(
+                f"{year}: expected all transfer differences to be NaN, "
+                f"found {nonmissing_transfer:,} nonmissing values."
+            )
+
+    return output, created_by_group
 
 
 # =============================================================================
@@ -239,389 +438,275 @@ def combine_years(years, common_columns):
 # =============================================================================
 
 def main():
-
     print("=" * 80)
-    print("CREATE MODEL 5 FULL-TALENT INPUT DATASETS")
+    print("GB MODEL 4 + RELATIVE TALENT MODEL INPUT CREATION")
     print("=" * 80)
+    print()
 
-    print(f"Project root: {PROJECT_ROOT}")
-    print(f"Source directory: {SOURCE_DIR}")
-    print(f"Output directory: {OUTPUT_DIR}")
+    print(f"Baseline predictors:        {len(BASELINE_FEATURES)}")
+    print(f"Returning-production diffs: {len(RETURNING_FEATURES)}")
+    print(f"Recruiting diffs:           {len(RECRUITING_FEATURES)}")
+    print(f"Transfer-portal diffs:      {len(TRANSFER_FEATURES)}")
+    print(f"Total talent predictors:    {len(TALENT_FEATURES)}")
+    print(f"Total model predictors:     {len(MODEL_FEATURES)}")
+    print(f"Total output columns:       {len(OUTPUT_COLUMNS)}")
+    print()
+    print("Talent definition: home-team value minus away-team value")
+    print("Transfer differences: NaN for 2015-2020; no imputation here.")
+    print()
 
-    # =========================================================================
-    # CREATE OUTPUT DIRECTORY
-    # =========================================================================
+    # Fail immediately if the feature specification is accidentally changed.
+    if len(BASELINE_FEATURES) != 28:
+        raise AssertionError(
+            f"Expected 28 baseline features, "
+            f"found {len(BASELINE_FEATURES)}."
+        )
+
+    if len(RETURNING_FEATURES) != 12:
+        raise AssertionError(
+            "Expected 12 returning-production features."
+        )
+
+    if len(RECRUITING_FEATURES) != 7:
+        raise AssertionError(
+            "Expected 7 recruiting features."
+        )
+
+    if len(TRANSFER_FEATURES) != 18:
+        raise AssertionError(
+            "Expected 18 transfer features."
+        )
+
+    if len(MODEL_FEATURES) != 65:
+        raise AssertionError(
+            f"Expected 65 predictors, found {len(MODEL_FEATURES)}."
+        )
+
+    if len(set(MODEL_FEATURES)) != len(MODEL_FEATURES):
+        raise AssertionError(
+            "Model feature list contains duplicate names."
+        )
 
     OUTPUT_DIR.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    # =========================================================================
-    # LOAD ALL SOURCE FILES ONCE
-    # =========================================================================
-
-    print()
-    print("=" * 80)
-    print("LOADING ALL SOURCE SEASONS")
-    print("=" * 80)
-
     season_frames = {}
+    season_audit_rows = []
+
+    # -------------------------------------------------------------------------
+    # Load, validate, and transform each season independently.
+    # -------------------------------------------------------------------------
 
     for year in ALL_YEARS:
+        source_df = load_season(year)
 
-        df = load_season(year)
-
-        validate_season(
-            df,
+        model_df, created_by_group = build_model_input(
+            source_df,
             year,
         )
 
-        season_frames[year] = df
+        season_frames[year] = model_df
 
-    # =========================================================================
-    # BUILD COMMON SCHEMA
-    # =========================================================================
+        season_audit_rows.append(
+            {
+                "season": year,
+                "rows": len(model_df),
+                "columns": len(model_df.columns),
+                "baseline_feature_count": len(BASELINE_FEATURES),
+                "returning_diff_count": len(
+                    created_by_group["returning_production"]
+                ),
+                "recruiting_diff_count": len(
+                    created_by_group["recruiting"]
+                ),
+                "transfer_diff_count": len(
+                    created_by_group["transfer_portal"]
+                ),
+                "transfer_diff_nonmissing_values": int(
+                    model_df[TRANSFER_FEATURES_DIFF]
+                    .notna()
+                    .sum()
+                    .sum()
+                ),
+                "target_missing": int(
+                    model_df[TARGET_COLUMN].isna().sum()
+                ),
+                "duplicate_game_ids": int(
+                    model_df[GAME_ID_COLUMN].duplicated().sum()
+                ),
+            }
+        )
 
-    print()
-    print("=" * 80)
-    print("BUILDING COMMON MODELING SCHEMA")
-    print("=" * 80)
+        print(
+            f"  Built {year}: {len(model_df):,} rows, "
+            f"{len(MODEL_FEATURES)} predictors"
+        )
 
-    common_columns = build_common_schema(
-        list(season_frames.values())
-    )
-
-    print(
-        f"Common schema: {len(common_columns):,} columns"
-    )
-
-    print(
-        f"2015-2020 source columns: "
-        f"{len(season_frames[2015].columns):,}"
-    )
-
-    print(
-        f"2021-2025 source columns: "
-        f"{len(season_frames[2021].columns):,}"
-    )
-
-    # =========================================================================
-    # IDENTIFY COLUMNS INTRODUCED AFTER 2020
-    # =========================================================================
-
-    early_columns = set(
-        season_frames[2015].columns
-    )
-
-    late_columns = set(
-        season_frames[2021].columns
-    )
-
-    late_only_columns = sorted(
-        late_columns - early_columns
-    )
-
-    print()
-    print(
-        f"Columns introduced in 2021+: "
-        f"{len(late_only_columns):,}"
-    )
-
-    if late_only_columns:
-        print("2021+ columns:")
-        for column in late_only_columns:
-            print(f"  - {column}")
-
-    # =========================================================================
-    # BUILD TEMPORAL DATASETS
-    # =========================================================================
-
-    print()
-    print("=" * 80)
-    print("BUILDING TRAINING DATA")
-    print("=" * 80)
+    # -------------------------------------------------------------------------
+    # Construct temporal splits in chronological year order.
+    # -------------------------------------------------------------------------
 
     train_df = pd.concat(
-        [
-            align_to_schema(
-                season_frames[year],
-                common_columns,
-            )
-            for year in TRAIN_YEARS
-        ],
-        axis=0,
+        [season_frames[year] for year in TRAIN_YEARS],
         ignore_index=True,
     )
-
-    print(
-        f"Train: {len(train_df):,} rows × "
-        f"{len(train_df.columns):,} columns"
-    )
-
-    print()
-    print("=" * 80)
-    print("BUILDING VALIDATION DATA")
-    print("=" * 80)
 
     validation_df = pd.concat(
-        [
-            align_to_schema(
-                season_frames[year],
-                common_columns,
-            )
-            for year in VALIDATION_YEARS
-        ],
-        axis=0,
+        [season_frames[year] for year in VALIDATION_YEARS],
         ignore_index=True,
     )
-
-    print(
-        f"Validation: {len(validation_df):,} rows × "
-        f"{len(validation_df.columns):,} columns"
-    )
-
-    print()
-    print("=" * 80)
-    print("BUILDING TEST DATA")
-    print("=" * 80)
 
     test_df = pd.concat(
-        [
-            align_to_schema(
-                season_frames[year],
-                common_columns,
-            )
-            for year in TEST_YEARS
-        ],
-        axis=0,
+        [season_frames[year] for year in TEST_YEARS],
         ignore_index=True,
     )
 
-    print(
-        f"Test: {len(test_df):,} rows × "
-        f"{len(test_df.columns):,} columns"
-    )
+    # -------------------------------------------------------------------------
+    # Validate split membership, schema, and uniqueness.
+    # -------------------------------------------------------------------------
 
-    # =========================================================================
-    # SCHEMA VALIDATION
-    # =========================================================================
+    splits = [
+        ("train", train_df, TRAIN_YEARS),
+        ("validation", validation_df, VALIDATION_YEARS),
+        ("test", test_df, TEST_YEARS),
+    ]
 
-    print()
-    print("=" * 80)
-    print("SCHEMA VALIDATION")
-    print("=" * 80)
-
-    train_columns = list(train_df.columns)
-    validation_columns = list(validation_df.columns)
-    test_columns = list(test_df.columns)
-
-    if train_columns != validation_columns:
-        raise ValueError(
-            "Train and validation column schemas do not match."
+    for split_name, split_df, expected_years in splits:
+        actual_years = sorted(
+            split_df[SEASON_COLUMN].astype(int).unique().tolist()
         )
 
-    if train_columns != test_columns:
-        raise ValueError(
-            "Train and test column schemas do not match."
-        )
-
-    print(
-        f"All datasets contain identical schemas "
-        f"({len(common_columns):,} columns)."
-    )
-
-    # =========================================================================
-    # TEMPORAL VALIDATION
-    # =========================================================================
-
-    train_min = train_df["season"].min()
-    train_max = train_df["season"].max()
-
-    validation_min = validation_df["season"].min()
-    validation_max = validation_df["season"].max()
-
-    test_min = test_df["season"].min()
-    test_max = test_df["season"].max()
-
-    if train_min != 2015 or train_max != 2022:
-        raise ValueError(
-            f"Unexpected training seasons: "
-            f"{train_min}-{train_max}"
-        )
-
-    if validation_min != 2023 or validation_max != 2024:
-        raise ValueError(
-            f"Unexpected validation seasons: "
-            f"{validation_min}-{validation_max}"
-        )
-
-    if test_min != 2025 or test_max != 2025:
-        raise ValueError(
-            f"Unexpected test seasons: "
-            f"{test_min}-{test_max}"
-        )
-
-    print("Temporal splits validated.")
-
-    # =========================================================================
-    # GAME ID OVERLAP CHECKS
-    # =========================================================================
-
-    train_ids = set(train_df["gameId"])
-    validation_ids = set(validation_df["gameId"])
-    test_ids = set(test_df["gameId"])
-
-    train_validation_overlap = train_ids & validation_ids
-    train_test_overlap = train_ids & test_ids
-    validation_test_overlap = validation_ids & test_ids
-
-    if train_validation_overlap:
-        raise ValueError(
-            f"Train/validation gameId overlap detected: "
-            f"{len(train_validation_overlap)} games"
-        )
-
-    if train_test_overlap:
-        raise ValueError(
-            f"Train/test gameId overlap detected: "
-            f"{len(train_test_overlap)} games"
-        )
-
-    if validation_test_overlap:
-        raise ValueError(
-            f"Validation/test gameId overlap detected: "
-            f"{len(validation_test_overlap)} games"
-        )
-
-    print("No gameId overlap between temporal splits.")
-
-    # =========================================================================
-    # TRANSFER FEATURE MISSINGNESS CHECK
-    # =========================================================================
-
-    print()
-    print("=" * 80)
-    print("TRANSFER FEATURE SCHEMA CHECK")
-    print("=" * 80)
-
-    if late_only_columns:
-
-        train_transfer_missing = train_df[
-            late_only_columns
-        ].isna().all().all()
-
-        early_train = train_df[
-            train_df["season"] <= 2020
-        ]
-
-        early_transfer_missing = early_train[
-            late_only_columns
-        ].isna().all().all()
-
-        if not early_transfer_missing:
+        if actual_years != expected_years:
             raise ValueError(
-                "Expected 2021+ transfer columns to be entirely "
-                "missing for 2015-2020 rows."
+                f"{split_name}: expected seasons {expected_years}, "
+                f"found {actual_years}."
             )
 
-        print(
-            "2015-2020 transfer features: "
-            "all values are NaN as expected."
+        if list(split_df.columns) != OUTPUT_COLUMNS:
+            raise ValueError(
+                f"{split_name}: output schema/order mismatch."
+            )
+
+        validate_unique_key(
+            split_df,
+            [GAME_ID_COLUMN],
+            f"{split_name.title()} split",
         )
 
-        print(
-            "2021+ transfer features: "
-            "available in the source data."
+    # -------------------------------------------------------------------------
+    # Ensure game IDs do not overlap between temporal splits.
+    # -------------------------------------------------------------------------
+
+    train_ids = set(train_df[GAME_ID_COLUMN])
+    validation_ids = set(validation_df[GAME_ID_COLUMN])
+    test_ids = set(test_df[GAME_ID_COLUMN])
+
+    if train_ids & validation_ids:
+        raise ValueError(
+            "Game IDs overlap between train and validation."
         )
 
-    # =========================================================================
-    # WRITE OUTPUT FILES
-    # =========================================================================
+    if train_ids & test_ids:
+        raise ValueError(
+            "Game IDs overlap between train and test."
+        )
 
-    train_path = OUTPUT_DIR / "train.csv"
-    validation_path = OUTPUT_DIR / "validation.csv"
-    test_path = OUTPUT_DIR / "test.csv"
+    if validation_ids & test_ids:
+        raise ValueError(
+            "Game IDs overlap between validation and test."
+        )
+
+    # -------------------------------------------------------------------------
+    # Save the three modeling datasets.
+    # -------------------------------------------------------------------------
 
     train_df.to_csv(
-        train_path,
+        OUTPUT_DIR / "train.csv",
         index=False,
     )
 
     validation_df.to_csv(
-        validation_path,
+        OUTPUT_DIR / "validation.csv",
         index=False,
     )
 
     test_df.to_csv(
-        test_path,
+        OUTPUT_DIR / "test.csv",
         index=False,
     )
 
-    # =========================================================================
-    # SUMMARY
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # Save the ordered predictor list and feature groups.
+    # -------------------------------------------------------------------------
+
+    feature_groups = (
+        ["gb_model_4_baseline"] * len(BASELINE_FEATURES)
+        + ["returning_production"] * len(RETURNING_FEATURES)
+        + ["recruiting"] * len(RECRUITING_FEATURES)
+        + ["transfer_portal"] * len(TRANSFER_FEATURES)
+    )
+
+    feature_list = pd.DataFrame(
+        {
+            "feature": MODEL_FEATURES,
+            "feature_index": range(len(MODEL_FEATURES)),
+            "feature_group": feature_groups,
+        }
+    )
+
+    feature_list.to_csv(
+        OUTPUT_DIR / "feature_list.csv",
+        index=False,
+    )
+
+    # -------------------------------------------------------------------------
+    # Save a concise per-season structural audit.
+    # -------------------------------------------------------------------------
+
+    audit_df = pd.DataFrame(season_audit_rows)
+
+    audit_df.to_csv(
+        OUTPUT_DIR / "season_audit.csv",
+        index=False,
+    )
+
+    # -------------------------------------------------------------------------
+    # Final summary.
+    # -------------------------------------------------------------------------
 
     print()
     print("=" * 80)
-    print("DATASET SUMMARY")
+    print("SPLIT SUMMARY")
     print("=" * 80)
 
     print(
-        f"Train:      {len(train_df):,} rows × "
-        f"{len(train_df.columns):,} columns"
+        f"Train:      {len(train_df):,} rows | "
+        f"seasons {TRAIN_YEARS[0]}-{TRAIN_YEARS[-1]}"
     )
 
     print(
-        f"Validation: {len(validation_df):,} rows × "
-        f"{len(validation_df.columns):,} columns"
+        f"Validation: {len(validation_df):,} rows | "
+        f"seasons {VALIDATION_YEARS}"
     )
 
     print(
-        f"Test:       {len(test_df):,} rows × "
-        f"{len(test_df.columns):,} columns"
+        f"Test:       {len(test_df):,} rows | "
+        f"seasons {TEST_YEARS}"
     )
 
     print()
-    print(
-        f"Train seasons:      "
-        f"{train_df['season'].min()}-{train_df['season'].max()}"
-    )
-
-    print(
-        f"Validation seasons: "
-        f"{validation_df['season'].min()}-{validation_df['season'].max()}"
-    )
-
-    print(
-        f"Test seasons:       "
-        f"{test_df['season'].min()}-{test_df['season'].max()}"
-    )
-
+    print(f"Output directory:\n  {OUTPUT_DIR}")
     print()
-    print(
-        f"Train target mean:      "
-        f"{train_df[TARGET_COLUMN].mean():.6f}"
-    )
-
-    print(
-        f"Validation target mean: "
-        f"{validation_df[TARGET_COLUMN].mean():.6f}"
-    )
-
-    print(
-        f"Test target mean:       "
-        f"{test_df[TARGET_COLUMN].mean():.6f}"
-    )
-
+    print("Files saved:")
+    print("  train.csv")
+    print("  validation.csv")
+    print("  test.csv")
+    print("  feature_list.csv")
+    print("  season_audit.csv")
     print()
-    print(f"Train output:      {train_path}")
-    print(f"Validation output: {validation_path}")
-    print(f"Test output:       {test_path}")
-
-    print()
-    print("=" * 80)
-    print("MODEL 5 INPUT DATASETS CREATED SUCCESSFULLY")
+    print("All checks passed.")
     print("=" * 80)
 
 
